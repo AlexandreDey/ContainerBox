@@ -17,14 +17,14 @@ How it works ?
 Usage:
 ------
   **Install**
-    Install *lxd* and *xephyr* (and *xpra* if you want) on your host 
-    Run install.sh
+- Install *lxd* and *xephyr* (and *xpra* if you want) on your host 
+- Run install.sh
   
   **Create a container**
-    ContainerBox create -n NAME_OF_CONTAINER(required) -t DISTRO_TO_USE (ubuntu debian fedora -- default: fedora) -d DESKTOP_ENVIRONMENT(KDE GNOME XFCE MATE -- default: XFCE) --x yes|no (experimental xpra support -- default:no)
+- ContainerBox create -n NAME_OF_CONTAINER(required) -t DISTRO_TO_USE (ubuntu debian fedora -- default: fedora) -d DESKTOP_ENVIRONMENT(KDE GNOME XFCE MATE -- default: XFCE) --x yes|no (experimental xpra support -- default:no)
   
   **Start a container**
-    ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!!security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)
+- ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!!security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)
  
 TODO List (from priority to eventuality)
 ----------------------------------------
