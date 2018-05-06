@@ -5,10 +5,21 @@ B="${A[@]:1}"
 CONFIG=/etc/ContainerBox
 BASH=/bin/bash
 
+
+function usage{
+    echo "Create a new container:"
+    echo "ContainerBox create -n NAME_OF_CONTAINER(required) -t DISTRO_TO_USE (ubuntu debian fedora -- default: fedora) -d DESKTOP_ENVIRONMENT(KDE GNOME XFCE MATE -- default: XFCE) --x yes|no (experimental xpra support -- default:no)"
+
+    echo "-----------------------"
+    echo "Start a container: "
+    echo "ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!! security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)"
+}
+
 if [ "$1" = "create" ]; then
     $BASH $CONFIG/creator/create $B
 elif [ "$1" = "start" ]; then
     $BASH $CONFIG/host/start $B
 else
     echo "Unknown option $1"
+    usage
 fi
