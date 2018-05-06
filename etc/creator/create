@@ -1,0 +1,119 @@
+#!/bin/bash
+LXC=/usr/bin/lxc
+BASH=/bin/bash
+
+CB_CONF=/etc/ContainerBox
+
+CONFIG_DIR="$CB_CONF/creator"
+
+function generate_password {
+   PWD=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-16};echo;)
+   echo $PWD
+}
+
+function finish_setup {
+    # Passthrough gpu device
+    $LXC config device add $1 gpu gpu
+
+    # Create the user and set it as a sudoer
+    $LXC exec $1 -- groupadd wheel
+    $LXC exec $1 -- useradd -m $2 -G wheel
+
+    # Change password
+    $LXC exec $1 -- bash -c "echo -e \"$3\n$3\n\" | passwd $2"
+
+    # Disable autostart by default
+    $LXC config device set $1 boot.autostart false
+
+}
+
+XPRA='no'
+TEMPLATE='fedora'
+DE='XFCE'
+USER='admin'
+PASSWORD=$(generate_password)
+
+
+while [[ $# -gt 0 ]]
+do
+key="$1"
+
+case $key in
+    -t|--template)
+    TEMPLATE="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -d|--desktop_environment)
+    DE="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -n|--name)
+    NAME="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    --xpra)
+    if [ "$2" = "yes" ] || [ "$2" = "no" ]; then
+        XPRA="$2"
+    else
+        echo "Unknown value '$2' for parameter $key"
+        exit
+    fi
+    shift # past argument
+    shift # past value
+    ;;
+    -u|--user)
+    USER="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -p|--password)
+    PASSWORD="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    *)    # unknown option
+    echo "Unknown parameter '$key' !"
+    exit
+    ;;
+esac
+done
+
+if [ -z $NAME ]; then
+    echo "Provide at least the name of the box"
+    exit 
+fi
+
+if [ ! -f "$CONFIG_DIR/templates/$TEMPLATE" ]; then 
+    echo "Template '$TEMPLATE' does not exist. You can create it if you want and place the file in the '$(pwd)/$CONFIG_DIR' folder"
+fi
+
+if [ "$DE" != "XFCE" ] && [ "$DE" != "MATE" ] && [ "$DE" != "KDE" ] && [ "$DE" != "GNOME" ] && [ "$DE" != "none" ]; then
+    echo "Desktop Environment $DE is not supported (yet?). You can contact me if you want it to be added."
+    echo "In the meantime, you can set the Desktop Environment parameter to 'none' and install yours after"
+    exit
+fi
+
+if [ "$XPRA" = "yes" ]; then
+    if [ ! -f "$CONFIG_DIR/templates/xpra_$TEMPLATE" ]; then
+        echo "XPRA is not possible for template $TEMPLATE"
+        exit 
+    fi
+fi
+
+echo "Creating Box $NAME"
+echo "Using template '$TEMPLATE'"
+echo "Installing Desktop Environment '$DE'"
+echo "Setting $USER as the first user (and sudoer)"
+echo "Password will be set to: $PASSWORD"
+echo "Installing experimental Xpra support ? $XPRA"
+
+if [ "$XPRA" = "yes" ]; then
+    CB_CONF=$CB_CONF $BASH $CONFIG_DIR/templates/xpra_$TEMPLATE $NAME $DE
+else
+    CB_CONF=$CB_CONF $BASH $CONFIG_DIR/templates/$TEMPLATE $NAME $DE
+fi
+
+finish_setup $NAME $USER $PASSWORD

@@ -1,0 +1,56 @@
+#!/bin/bash
+
+LXC=/usr/bin/lxc
+CONF="$CB_CONF/creator/resources/10_container_box.conf"
+
+function create_container {
+    $LXC launch images:fedora/27 $1
+    echo "Waiting for end of init"
+    sleep 5
+}
+
+function install_de_xfce {
+    $LXC exec $1 -- dnf update -y
+    $LXC exec $1 -- dnf groupinstall -y xfce
+}
+
+function install_de_kde {
+    $LXC exec $1 -- dnf update -y
+    $LXC exec $1 -- dnf groupinstall -y kde
+}
+
+function install_de_mate {
+    $LXC exec $1 -- dnf update -y
+    $LXC exec $1 -- dnf groupinstall -y mate
+}
+
+function install_de_gnome {
+    $LXC exec $1 -- dnf update -y
+    $LXC exec $1 -- dnf groupinstall -y gnome
+}
+
+function install_de {
+    if [ "$2" = "XFCE" ]; then
+        install_de_xfce $1
+    fi
+    if [ "$2" = "KDE" ]; then
+        install_de_kde $1
+    fi
+    if [ "$2" = "MATE" ]; then
+        install_de_mate $1
+    fi
+    if [ "$2" = "GNOME" ]; then
+        install_de_gnome $1
+    fi
+}
+
+function finish_install {
+    $LXC exec $1 -- dnf install -y lightdm
+    $LXC exec $1 -- dnf install -y sudo
+
+    $LXC file push $CONF $1/etc/lightdm/lightdm.conf.d/
+}
+
+create_container $1
+install_de $1 $2
+finish_install $1

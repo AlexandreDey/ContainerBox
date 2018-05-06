@@ -1,0 +1,14 @@
+#!/bin/bash
+
+A=($@)
+B="${A[@]:1}"
+CONFIG=/etc/ContainerBox
+BASH=/bin/bash
+
+if [ "$1" = "create" ]; then
+    $BASH $CONFIG/creator/create $B
+elif [ "$1" = "start" ]; then
+    $BASH $CONFIG/host/start $B
+else
+    echo "Unknown option $1"
+fi

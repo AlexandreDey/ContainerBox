@@ -1,0 +1,9 @@
+#!/bin/bash
+
+LXC=/usr/bin/lxc
+TEMPLATES="templates"
+BASH=/bin/bash
+
+CB_CONF=$CB_CONF $BASH $TEMPLATES/fedora $@
+
+$LXC exec $1 -- dnf install xpra
