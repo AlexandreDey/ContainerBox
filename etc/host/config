@@ -1,0 +1,287 @@
+#!/bin/bash
+
+LXC=/usr/bin/lxc
+
+function create_lxdNAT_network {
+    DEVICE_HOST_NAME=$1
+    IP=$2
+    # device already exists ?
+    test=$($LXC network show $DEVICE_HOST_NAME)
+    if [ -z "$test" ]; then
+        $LXC network create $DEVICE_HOST_NAME ipv4.address=$IP 
+    else
+        test=$($LXC network show $DEVICE_HOST_NAME | grep "ipv4.nat: \"true\"")
+        if [ -z "$test" ]; then
+            echo "[ERROR] : network $DEVICE_HOST_NAME already exists but it's not a NATed interface, can't use it as a NATed bridge"
+            return
+        fi
+    fi
+}
+function create_lxd_network {
+    DEVICE_HOST_NAME=$1
+    IP=$2
+    # device already exists ?
+    test=$($LXC network show $DEVICE_HOST_NAME)
+    if [ -z "$test" ]; then
+        $LXC network create $DEVICE_HOST_NAME ipv4.address=$IP  ipv4.nat=false
+    else
+        test=$($LXC network show $DEVICE_HOST_NAME | grep "ipv4.nat: \"false\"")
+        if [ -z "$test" ]; then
+            echo "[ERROR] : network $DEVICE_HOST_NAME already exists but it's a NATed interface, can't use it as an internal only bridge"
+            return
+        fi
+    fi
+}
+
+
+# Profile based not the preferred way
+function create_macvlan_interface {
+    DEVICE_HOST_NAME=$1
+    DEVICE_CONTAINER_NAME=$2
+    PROFILE_NAME="$1_macvlan"
+    # profile already exists ?
+    test=$($LXC profile list | grep $PROFILE_NAME)
+    if [ -z "$test" ]; then
+        $LXC profile copy default $PROFILE_NAME
+        test=$($LXC profile show $PROFILE_NAME | grep "$DEVICE_CONTAINER_NAME")
+        if [ -z "$test" ]; then
+            # The nic is not present in the config, create it
+           $LXC profile device add $PROFILE_NAME $DEVICE_CONTAINER_NAME nic nictype=macvlan parent=$DEVICE_HOST_NAME
+        else
+            # It is there, update it
+            $LXC profile device set $PROFILE_NAME $DEVICE_CONTAINER_NAME nictype macvlan
+            $LXC profile device set $PROFILE_NAME $DEVICE_CONTAINER_NAME parent $DEVICE_HOST_NAME
+        fi
+    fi
+}
+
+function network_add {
+    CONTAINER_NAME=$1
+    DEVICE_CONTAINER_NAME="eth0"
+    DEVICE_HOST_NAME="lxdbr0"
+    TYPE="lxdNAT"
+    IP="10.0.2.1/24"
+
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ ! -z "$2" ] || [ "none" != "$2" ]; then
+        DEVICE_CONTAINER_NAME=$2
+    fi
+    if [ ! -z "$3" ] || [ "none" != "$3" ]; then
+        DEVICE_HOST_NAME=$3
+    fi
+    if [ ! -z "$4" ] || [ "none" != "$4" ]; then
+        TYPE=$4
+    fi
+    if [ ! -z "$5" ] || [ "none" != "$5" ]; then
+        IP=$5
+    fi
+
+    if [ "$TYPE" = "lxdNAT" ]; then
+
+        create_lxdNAT_network $DEVICE_HOST_NAME $IP
+
+        # Already attached ?
+        test=$($LXC network show $DEVICE_HOST_NAME | grep "$CONTAINER_NAME")
+        if [ -z "$test" ]; then
+            $LXC network attach $DEVICE_HOST_NAME $CONTAINER_NAME $DEVICE_CONTAINER_NAME
+        else 
+            echo "[ERROR] : $DEVICE_HOST_NAME already attached to $CONTAINER_NAME"
+        fi
+        
+    fi
+
+    if [ "$TYPE" = "lxd" ]; then
+        create_lxd_network $DEVICE_HOST_NAME $IP
+
+        # Already attached ?
+        test=$($LXC network show $DEVICE_HOST_NAME | grep "$CONTAINER_NAME")
+        if [ -z "$test" ]; then
+            $LXC network attach $DEVICE_HOST_NAME $CONTAINER_NAME $DEVICE_CONTAINER_NAME
+        fi
+    fi
+
+    # Create a macvlan on an existing interface 
+    if [ "$TYPE" = "macvlan" ]; then
+        #create_macvlan_interface $DEVICE_HOST_NAME $DEVICE_CONTAINER_NAME
+        #$LXC profile assign $CONTAINER_NAME "$DEVICE_HOST_NAME_macvlan"
+        $LXC config device add $CONTAINER_NAME $DEVICE_CONTAINER_NAME nic nictype=macvlan parent=$DEVICE_HOST_NAME
+    fi
+
+    # Passthrough a NIC from the host (can be vETH or physical or anything)
+    if [ "$TYPE" = "physical" ]; then
+        $LXC config device add $CONTAINER_NAME $DEVICE_CONTAINER_NAME nic nictype=physical parent=$DEVICE_HOST_NAME
+    fi
+
+
+}
+
+function network_remove {
+    CONTAINER_NAME=$1
+    DEVICE_CONTAINER_NAME=$2
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Device name in container mandatory"
+        return
+    fi
+
+    NICTYPE=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 -A2 | grep "$DEVICE_CONTAINER_NAME:" -A3 | grep "nictype:" | cut -d':' -f2 | cut -d' ' -f2 )
+
+    if [ -z "$NICTYPE" ]; then
+        "[ERROR] : $DEVICE_CONTAINER_NAME is not attached to $CONTAINER_NAME"
+        return
+    fi
+
+    if [ "$NICTYPE" = "physical" ] || [ "$NICTYPE" = "macvlan" ]; then
+        $LXC config device remove $CONTAINER_NAME $DEVICE_CONTAINER_NAME
+    else
+        PARENT=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 -A2 | grep "$DEVICE_CONTAINER_NAME:" -A3 | grep "parent:" | cut -d':' -f2 | cut -d' ' -f2 )
+        $LXC network detach $PARENT $CONTAINER_NAME
+        echo "$DEVICE_CONTAINER_NAME removed from $CONTAINER_NAME"
+    fi
+
+
+}
+
+function network_set {
+    CONTAINER_NAME=$1
+    DEVICE_CONTAINER_NAME=$2
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Device name in container mandatory"
+        return
+    fi
+    # first remove the old one
+    network_remove $CONTAINER_NAME $DEVICE_CONTAINER_NAME
+
+    # the add a new one
+    network_add $@
+}
+
+function network_get {
+    if [ -z "$(echo $@)" ];then
+        echo "- Done -"
+        return
+    fi
+    CONTAINER_NAME=$1
+    DEVICE_CONTAINER_NAME=$2
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Device name in container mandatory"
+        return
+    fi
+    rawNICTYPE=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 -A2 | grep "$DEVICE_CONTAINER_NAME:" -A3 | grep "nictype:" | cut -d':' -f2 | cut -d' ' -f2 )
+    PARENT=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 -A2 | grep "$DEVICE_CONTAINER_NAME:" -A3 | grep "parent:" | cut -d':' -f2 | cut -d' ' -f2 )
+
+    if [ -z "$rawNICTYPE" ]; then
+        "[ERROR] : $DEVICE_CONTAINER_NAME is not attached to $CONTAINER_NAME"
+        return
+    fi
+
+    NICTYPE=$rawNICTYPE
+    IP="N/A"
+
+    if [ "$rawNICTYPE" = "bridged" ];then
+
+        test=$($LXC network show $PARENT | grep "ipv4.nat: \"true\"")
+        if [ ! -z "$test" ]; then
+            NICTYPE="lxdNAT"
+        else
+            NICTYPE="lxd"
+        fi
+
+        IP=$($LXC network show $PARENT | grep "ipv4.address: " | cut -d':' -f2 | cut -d' ' -f2)
+
+    fi
+
+    echo "$DEVICE_CONTAINER_NAME: type=$NICTYPE -- host_interface=$PARENT -- network_address=$IP"
+}
+
+function network_list {
+    CONTAINER_NAME=$1
+    if [ -z "$1" ] || [ "none" = "$1" ] ; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    raw=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 | grep -v "nictype:")
+    nb=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 | grep -v "nictype:" | wc -l)
+    for i in $(seq 1 2 $nb); do
+        NAME=$(echo $raw | cut -d' ' -f$i | cut -d':' -f1)
+        network_get $CONTAINER_NAME $NAME
+    done
+}
+
+function network_usage {
+    echo "ContainerBox config network ACTION CONTAINER_NAME [OPTIONS]:"
+    echo -e "\tlist: list all network interfaces for this container"
+    echo ""
+    echo -e "\tget: get information for a particular interface"
+    echo -e "\t\tContainerBox config network get CONTAINER_NAME INTERFACE_NAME"
+    echo ""
+    echo -e "\tset: set configuration for a particular interface"
+    echo -e "\t\tContainerBox config network set CONTAINER_NAME INTERFACE_NAME [OPTIONS]"
+    echo ""
+    echo -e "\tadd: add a new interface to the container"
+    echo -e "\t\tContainerBox config network add CONTAINER_NAME INTERFACE_NAME HOSTSIDE_NAME INTERFACE_TYPE(-lxdNAT-|lxd|macvlan|physical) NETWORK_IP"
+    echo -e "\t\t\tlxdNAT: a LXD managed network that is NATed"
+    echo -e "\t\t\tlxd: a LXD managed network that is NOT NATed (can't communicate with host LAN)"
+    echo -e "\t\t\tmacvlan: attach a virtual MAC address on a host interface"
+    echo -e "\t\t\tphysical: passthrough a host interface"
+    echo ""
+    echo -e "\tremove: remove an existing interface from the container"
+} 
+
+function network {
+    ACTION=$1
+    NAME=$2
+    if [ -z "$1" ] || [ "none" = "$1" ] ; then
+        network_usage
+        exit
+    fi
+    if [ -z "$2" ] ; then
+        echo "[ERROR] : Provide a container name"
+        exit
+    fi
+    test="$LXC list | grep ' $2 '"
+    if [ -z "$test" ] ; then
+        echo "[ERROR] : unknown container $2"
+        exit
+    fi
+    A=($@)
+    B="${A[@]:1}"
+    if [ "$ACTION" = "list" ];then
+        network_list $B
+    fi
+    if [ "$ACTION" = "get" ];then
+        network_get $B
+    fi
+    if [ "$ACTION" = "set" ];then
+        network_set $B
+    fi
+    if [ "$ACTION" = "add" ];then
+        network_add $B
+    fi
+    if [ "$ACTION" = "remove" ];then
+        network_remove $B
+    fi
+}
+
+A=($@)
+B="${A[@]:1}"
+
+if [ "$1" = "network" ];then
+    network $B
+else
+    echo "Unknown action $1"
+fi

@@ -25,11 +25,14 @@ Usage:
   
 -  **Start a container**
 + ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!!security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)
+
+-  **Configure a container**
++ ContainerBox config  network|system(WIP)|shared_folder(WIP) NAME_OF_CONTAINER(required) [ OPTIONS ]
  
 TODO List (from priority to eventuality)
 ----------------------------------------
 - Enable sound (pulseaudio server on the host and/or ALSA in the container with /dev/snd passthrough)
-- Easy exposure of network and resources configuration
+- Easy exposure of network(DONE) and resources configuration
 - Shared folder 
 - Create a nice GUI on top of the CLI
 - Backup/snapshot

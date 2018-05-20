@@ -13,12 +13,18 @@ function usage {
     echo "-----------------------"
     echo "Start a container: "
     echo "ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!! security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)"
+
+    echo "-----------------------"
+    echo "Configure a container: "
+    echo "ContainerBox config  network|system(WIP)|shared_folder(WIP) NAME_OF_CONTAINER(required) [ OPTIONS ]  "
 }
 
 if [ "$1" = "create" ]; then
     $BASH $CONFIG/creator/create $B
 elif [ "$1" = "start" ]; then
     $BASH $CONFIG/host/start $B
+elif [ "$1" = "config" ]; then
+    $BASH $CONFIG/host/config $B
 else
     echo "Unknown option $1"
     usage
