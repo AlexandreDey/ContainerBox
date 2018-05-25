@@ -9,6 +9,8 @@ CHMOD=/bin/chmod
 CHOWN=/bin/chown
 XORG=/usr/bin/Xorg
 SUDO=/usr/bin/sudo
+CUT=/bin/cut
+GREP=/bin/grep
 
 echo "$@"
 
@@ -90,8 +92,8 @@ function create_xpra {
     $LXC exec $1 -- xpra start-desktop --xvfb="Xorg -noreset +extension GLX +extension RANDR +extension RENDER -logfile ./0.log -config /etc/xpra/xorg.conf :0" --bind-tcp=0.0.0.0:10000
     
     echo "Waiting for server creation"
-    lxdip=$($LXC list | grep "| $1 " | cut -d'|' -f4 | cut -d' ' -f2)
-    while [ -z "$(nmap $lxdip -p 10000 | grep open)" ]; do
+    lxdip=$($LXC list | $GREP "| $1 " | $CUT -d'|' -f4 | $CUT -d' ' -f2)
+    while [ -z "$(nmap $lxdip -p 10000 | $GREP open)" ]; do
         echo "still closed"
         sleep 1
     done
@@ -100,13 +102,13 @@ function create_xpra {
 
 function launch_xpra {
     create_xpra $1
-    lxdip=$($LXC list | grep "| $1 " | cut -d'|' -f4 | cut -d' ' -f2)
+    lxdip=$($LXC list | $GREP "| $1 " | $CUT -d'|' -f4 | $CUT -d' ' -f2)
     xpra attach tcp/$lxdip:10000 --opengl --encoding=rgb &
 }
 
 function launch_xpra_fullscreen {
     create_xpra $1
-    lxdip=$($LXC list | grep "| $1 " | cut -d'|' -f4 | cut -d' ' -f2)
+    lxdip=$($LXC list | $GREP "| $1 " | $CUT -d'|' -f4 | $CUT -d' ' -f2)
     xpra attach tcp/$lxdip:10000 --opengl --encoding=rgb --desktop-fullscreen=True &
 }
 
@@ -193,16 +195,21 @@ if [ -z $NAME ]; then
 fi
 
 # Check if container exists
-testing_life=$($LXC list | grep "| $NAME ")
+testing_life=$($LXC list | $GREP "| $NAME ")
 if [ -z  "$testing_life" ]; then
     echo "$NAME does not exist !"
     exit
 fi
 
 # Start container if not running 
-testing_life=$($LXC list | grep "| $NAME " | grep "RUNNING")
+testing_life=$($LXC list | $GREP "| $NAME " | $GREP "RUNNING")
 if [ -z "$testing_life" ]; then
     $LXC start $NAME
+fi
+testing_life=$($LXC list | $GREP "| $NAME " | $GREP "RUNNING")
+if [ -z "$testing_life" ]; then
+    echo "[ERROR] : Unable to start container"
+    exit
 fi
 
 launch $NAME $METHOD $FULLSCREEN

@@ -1,6 +1,16 @@
 #!/bin/bash
 
 LXC=/usr/bin/lxc
+CUT=/usr/bin/cut
+WC=/usr/bin/wc
+AWK=/usr/bin/awk
+CAT=/bin/cat
+GREP=/bin/grep
+
+
+
+
+######### NETWORK #########
 
 function create_lxdNAT_network {
     DEVICE_HOST_NAME=$1
@@ -10,7 +20,7 @@ function create_lxdNAT_network {
     if [ -z "$test" ]; then
         $LXC network create $DEVICE_HOST_NAME ipv4.address=$IP 
     else
-        test=$($LXC network show $DEVICE_HOST_NAME | grep "ipv4.nat: \"true\"")
+        test=$($LXC network show $DEVICE_HOST_NAME | $GREP "ipv4.nat: \"true\"")
         if [ -z "$test" ]; then
             echo "[ERROR] : network $DEVICE_HOST_NAME already exists but it's not a NATed interface, can't use it as a NATed bridge"
             return
@@ -25,7 +35,7 @@ function create_lxd_network {
     if [ -z "$test" ]; then
         $LXC network create $DEVICE_HOST_NAME ipv4.address=$IP  ipv4.nat=false
     else
-        test=$($LXC network show $DEVICE_HOST_NAME | grep "ipv4.nat: \"false\"")
+        test=$($LXC network show $DEVICE_HOST_NAME | $GREP "ipv4.nat: \"false\"")
         if [ -z "$test" ]; then
             echo "[ERROR] : network $DEVICE_HOST_NAME already exists but it's a NATed interface, can't use it as an internal only bridge"
             return
@@ -40,10 +50,10 @@ function create_macvlan_interface {
     DEVICE_CONTAINER_NAME=$2
     PROFILE_NAME="$1_macvlan"
     # profile already exists ?
-    test=$($LXC profile list | grep $PROFILE_NAME)
+    test=$($LXC profile list | $GREP $PROFILE_NAME)
     if [ -z "$test" ]; then
         $LXC profile copy default $PROFILE_NAME
-        test=$($LXC profile show $PROFILE_NAME | grep "$DEVICE_CONTAINER_NAME")
+        test=$($LXC profile show $PROFILE_NAME | $GREP "$DEVICE_CONTAINER_NAME")
         if [ -z "$test" ]; then
             # The nic is not present in the config, create it
            $LXC profile device add $PROFILE_NAME $DEVICE_CONTAINER_NAME nic nictype=macvlan parent=$DEVICE_HOST_NAME
@@ -84,7 +94,7 @@ function network_add {
         create_lxdNAT_network $DEVICE_HOST_NAME $IP
 
         # Already attached ?
-        test=$($LXC network show $DEVICE_HOST_NAME | grep "$CONTAINER_NAME")
+        test=$($LXC network show $DEVICE_HOST_NAME | $GREP "$CONTAINER_NAME")
         if [ -z "$test" ]; then
             $LXC network attach $DEVICE_HOST_NAME $CONTAINER_NAME $DEVICE_CONTAINER_NAME
         else 
@@ -97,7 +107,7 @@ function network_add {
         create_lxd_network $DEVICE_HOST_NAME $IP
 
         # Already attached ?
-        test=$($LXC network show $DEVICE_HOST_NAME | grep "$CONTAINER_NAME")
+        test=$($LXC network show $DEVICE_HOST_NAME | $GREP "$CONTAINER_NAME")
         if [ -z "$test" ]; then
             $LXC network attach $DEVICE_HOST_NAME $CONTAINER_NAME $DEVICE_CONTAINER_NAME
         fi
@@ -130,7 +140,7 @@ function network_remove {
         return
     fi
 
-    NICTYPE=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 -A2 | grep "$DEVICE_CONTAINER_NAME:" -A3 | grep "nictype:" | cut -d':' -f2 | cut -d' ' -f2 )
+    NICTYPE=$($LXC config show $CONTAINER_NAME --expanded | $GREP "nictype:" -B1 -A2 | $GREP "$DEVICE_CONTAINER_NAME:" -A3 | $GREP "nictype:" | $CUT -d':' -f2 | $CUT -d' ' -f2 )
 
     if [ -z "$NICTYPE" ]; then
         "[ERROR] : $DEVICE_CONTAINER_NAME is not attached to $CONTAINER_NAME"
@@ -140,7 +150,7 @@ function network_remove {
     if [ "$NICTYPE" = "physical" ] || [ "$NICTYPE" = "macvlan" ]; then
         $LXC config device remove $CONTAINER_NAME $DEVICE_CONTAINER_NAME
     else
-        PARENT=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 -A2 | grep "$DEVICE_CONTAINER_NAME:" -A3 | grep "parent:" | cut -d':' -f2 | cut -d' ' -f2 )
+        PARENT=$($LXC config show $CONTAINER_NAME --expanded | $GREP "nictype:" -B1 -A2 | $GREP "$DEVICE_CONTAINER_NAME:" -A3 | $GREP "parent:" | $CUT -d':' -f2 | $CUT -d' ' -f2 )
         $LXC network detach $PARENT $CONTAINER_NAME
         echo "$DEVICE_CONTAINER_NAME removed from $CONTAINER_NAME"
     fi
@@ -181,8 +191,8 @@ function network_get {
         echo "[ERROR] : Device name in container mandatory"
         return
     fi
-    rawNICTYPE=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 -A2 | grep "$DEVICE_CONTAINER_NAME:" -A3 | grep "nictype:" | cut -d':' -f2 | cut -d' ' -f2 )
-    PARENT=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 -A2 | grep "$DEVICE_CONTAINER_NAME:" -A3 | grep "parent:" | cut -d':' -f2 | cut -d' ' -f2 )
+    rawNICTYPE=$($LXC config show $CONTAINER_NAME --expanded | $GREP "nictype:" -B1 -A2 | $GREP "$DEVICE_CONTAINER_NAME:" -A3 | $GREP "nictype:" | $CUT -d':' -f2 | $CUT -d' ' -f2 )
+    PARENT=$($LXC config show $CONTAINER_NAME --expanded | $GREP "nictype:" -B1 -A2 | $GREP "$DEVICE_CONTAINER_NAME:" -A3 | $GREP "parent:" | $CUT -d':' -f2 | $CUT -d' ' -f2 )
 
     if [ -z "$rawNICTYPE" ]; then
         "[ERROR] : $DEVICE_CONTAINER_NAME is not attached to $CONTAINER_NAME"
@@ -194,14 +204,14 @@ function network_get {
 
     if [ "$rawNICTYPE" = "bridged" ];then
 
-        test=$($LXC network show $PARENT | grep "ipv4.nat: \"true\"")
+        test=$($LXC network show $PARENT | $GREP "ipv4.nat: \"true\"")
         if [ ! -z "$test" ]; then
             NICTYPE="lxdNAT"
         else
             NICTYPE="lxd"
         fi
 
-        IP=$($LXC network show $PARENT | grep "ipv4.address: " | cut -d':' -f2 | cut -d' ' -f2)
+        IP=$($LXC network show $PARENT | $GREP "ipv4.address: " | $CUT -d':' -f2 | $CUT -d' ' -f2)
 
     fi
 
@@ -214,10 +224,10 @@ function network_list {
         echo "[ERROR] : Container name mandatory"
         return
     fi
-    raw=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 | grep -v "nictype:")
-    nb=$($LXC config show $CONTAINER_NAME --expanded | grep "nictype:" -B1 | grep -v "nictype:" | wc -l)
+    raw=$($LXC config show $CONTAINER_NAME --expanded | $GREP "nictype:" -B1 | $GREP -v "nictype:")
+    nb=$($LXC config show $CONTAINER_NAME --expanded | $GREP "nictype:" -B1 | $GREP -v "nictype:" | $WC -l)
     for i in $(seq 1 2 $nb); do
-        NAME=$(echo $raw | cut -d' ' -f$i | cut -d':' -f1)
+        NAME=$(echo $raw | $CUT -d' ' -f$i | $CUT -d':' -f1)
         network_get $CONTAINER_NAME $NAME
     done
 }
@@ -253,8 +263,8 @@ function network {
         echo "[ERROR] : Provide a container name"
         exit
     fi
-    test="$LXC list | grep ' $2 '"
-    if [ -z "$test" ] ; then
+    test=$($LXC list | $GREP ' $2 ')
+    if [ ! -z "$test" ] ; then
         echo "[ERROR] : unknown container $2"
         exit
     fi
@@ -277,11 +287,366 @@ function network {
     fi
 }
 
+######### NETWORK #########
+
+
+######### SYSTEM #########
+
+function system_cpu_exec_cap {
+    CONTAINER_NAME=$1
+    LIMIT=$2
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Provide a value to use as limit"
+        return
+    fi
+    re='^[0-9]+$'
+    if ! [[ $LIMIT =~ $re ]] ; then
+        echo "[ERROR] : Limit should be a numerical value between 0-100"
+        return
+    fi
+
+    $LXC config set $CONTAINER_NAME limits.cpu.allowance "$LIMIT%"
+    echo "Execution cap of $CONTAINER_NAME set to $LIMIT%"
+}
+
+function system_cpu_cores {
+    CONTAINER_NAME=$1
+    LIMIT=$2
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Provide a value to use as limit"
+        return
+    fi
+    re='^[0-9]+$'
+    if ! [[ $LIMIT =~ $re ]] ; then
+        echo "[ERROR] : Limit should be a numerical value"
+        return
+    fi
+    $LXC config set $CONTAINER_NAME limits.cpu $LIMIT
+    echo "Number of cores of $CONTAINER_NAME set to $LIMIT"
+}
+
+function system_cpu_get {
+    CONTAINER_NAME=$1
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    EXEC_CAP=$($LXC config show $CONTAINER_NAME | $GREP "limits.cpu.allowance:" | $CUT -d':' -f2 | $CUT -d' ' -f2)
+    if [ -z "$EXEC_CAP" ];then
+        EXEC_CAP="100%"
+    fi
+    CORES=$($LXC config show $CONTAINER_NAME | $GREP "limits.cpu:" | $CUT -d':' -f2 | $CUT -d' ' -f2)
+    if [ -z "$CORES" ];then
+        CORES=$($CAT /proc/cpuinfo | $GREP -e "^processor" | $WC -l)
+    fi
+
+    echo "$CONTAINER_NAME:"
+    echo -e "\tNumber of Cores: $CORES"
+    echo -e "\tExecution Cap: $EXEC_CAP"
+
+}
+
+function system_cpu {
+    CONTAINER_NAME=$1
+    ACTION=$2
+    SUBJECT=$3
+    LIMIT=$4
+      
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Action type mandatory"
+        return
+    fi
+
+    if [ "set" = "$ACTION" ];then
+        if [ "$SUBJECT" = "cores" ];then
+            system_cpu_cores $CONTAINER_NAME $LIMIT
+        elif [ "$SUBJECT" = "exec_cap" ]; then
+            system_cpu_exec_cap $CONTAINER_NAME $LIMIT
+        else
+            echo "[ERROR] : Unknown property '$SUBJECT'"
+            return
+        fi
+    elif [ "get" = "$ACTION" ]; then
+        system_cpu_get $CONTAINER_NAME
+    else
+        echo "[ERROR] : Unknown action '$ACTION'"
+        return
+    fi
+
+}
+
+function system_memory_max {
+    CONTAINER_NAME=$1
+    let MAX="$($GREP MemTotal /proc/meminfo | $AWK '{print $2}') / 1024"
+    LIMIT=$2
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Provide a value to use as limit"
+        return
+    fi
+    re='^[0-9]+$'
+    if ! [[ $LIMIT =~ $re ]] ; then
+        echo "[ERROR] : Limit should be a numerical value (in MB)"
+        return
+    fi
+    if [ "$LIMIT" -gt "$MAX" ]; then
+        LIMIT=$MAX
+    fi
+    $LXC config set $CONTAINER_NAME limits.memory "$LIMIT"MB
+    echo "Max memory of $CONTAINER_NAME set to $LIMIT MB"
+}
+
+function system_memory_swap {
+    CONTAINER_NAME=$1
+    LIMIT=$2
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Provide a value to use as limit"
+        return
+    fi
+    if [ ! "$LIMIT" = "true" ] && [ ! "$LIMIT" = "false" ] ; then
+        echo "[ERROR] : Value should be 'true' or 'false', not '$LIMIT'"
+        return
+    fi
+    $LXC config set $CONTAINER_NAME limits.memory.swap $LIMIT
+    echo "Swap for $CONTAINER_NAME set to $LIMIT"
+}
+
+function system_memory_get {
+    CONTAINER_NAME=$1
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    MAX_MEM=$($LXC config show $CONTAINER_NAME | $GREP "limits.memory:" | $CUT -d':' -f2 | $CUT -d' ' -f2)
+    if [ -z "$MAX_MEM" ];then
+        let MAX_MEM="$($GREP MemTotal /proc/meminfo | $AWK '{print $2}') / 1024"
+    fi
+    SWAP=$($LXC config show $CONTAINER_NAME | $GREP "limits.memory.swap:" | $CUT -d':' -f2 | $CUT -d' ' -f2)
+    if [ -z "$SWAP" ];then
+        SWAP="true"
+    fi
+
+    echo "$CONTAINER_NAME:"
+    echo -e "\tMaximum Memory: $MAX_MEM"
+    echo -e "\tSwap Enabled: $SWAP"
+
+}
+
+function system_memory {
+    CONTAINER_NAME=$1
+    ACTION=$2
+    SUBJECT=$3
+    LIMIT=$4
+      
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Action type mandatory"
+        return
+    fi
+
+    if [ "set" = "$ACTION" ];then
+        if [ "$SUBJECT" = "max" ];then
+            system_memory_max $CONTAINER_NAME $LIMIT
+        elif [ "$SUBJECT" = "swap" ]; then
+            system_memory_swap $CONTAINER_NAME $LIMIT
+        else
+            echo "[ERROR] : Unknown property '$SUBJECT'"
+            return
+        fi
+    elif [ "get" = "$ACTION" ]; then
+        system_memory_get $CONTAINER_NAME
+    else
+        echo "[ERROR] : Unknown action '$ACTION'"
+        return
+    fi
+}
+
+
+function system {
+    CONTAINER_NAME=$1
+    CATEGORY=$2
+    ACTION=$3
+    SUBJECT=$4
+    LIMIT=$5
+      
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    test=$($LXC list | $GREP "| $1 ")
+    if [ -z "$test" ] ; then
+        echo "[ERROR] : unknown container $1"
+        return
+    fi
+
+    if [ "cpu" = "$CATEGORY" ];then
+        system_cpu $CONTAINER_NAME $ACTION $SUBJECT $LIMIT
+    elif [ "memory" = "$CATEGORY" ]; then
+        system_memory $CONTAINER_NAME $ACTION $SUBJECT $LIMIT
+    else
+        echo "[ERROR] : Unknown category '$CATEGORY'"
+        return
+    fi
+}
+
+######### SYSTEM #########
+
+######### SHARED FOLDER #########
+MD5=/usr/bin/md5sum
+SETFACL=/usr/bin/setfacl
+SF_DIR=/home/$USER/.ContainerBox/shared_folder
+MKDIR=/bin/mkdir
+LXC_USER=$($GREP "lxd" /etc/subuid | $CUT -d':' -f2)
+
+function shared_folder_add {    
+    CONTAINER_NAME=$1
+    FOLDER=$2
+    CONTAINER_FOLDER=$3
+    PERMS="rw-"
+
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ ! -d "$FOLDER" ]; then
+        echo "[ERROR] : Cannot share '$FOLDER', no such directory"
+        return
+    fi
+    if [ -z "$3" ];then
+        echo "[ERROR] : Folder name inside container mandatory"
+        return
+    fi
+    if [ ! -z "$4" ];then
+        PERMS=$4
+    fi
+    if [ ! -z $($GREP "$CONTAINER_NAME:$FOLDER" "$SF_DIR/list") ];then
+        echo "[ERROR] : Folder '$FOLDER' already shared with $CONTAINER_NAME"
+        return
+    fi
+
+    NAME=$(echo "$FOLDER" | $MD5 | $CUT -d' ' -f1)
+    
+
+    # Set ACL so that root in container can use the directory
+    $SETFACL -Rm user:lxd:rwx,default:user:lxd:rwx,user:$LXC_USER:$PERMS,default:user:$LXC_USER:$PERMS $FOLDER
+    # keep track of all shared folders
+    echo "$CONTAINER_NAME:$FOLDER:$PERMS" >> "$SF_DIR/list"
+
+    $LXC config device add $CONTAINER_NAME $NAME disk source=$FOLDER path=$CONTAINER_FOLDER
+
+}
+
+function shared_folder_remove {    
+    CONTAINER_NAME=$1
+    FOLDER=$2
+
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ ! -d "$FOLDER" ]; then
+        echo "[ERROR] : Cannot share '$FOLDER', no such directory"
+        return
+    fi
+    NAME=$(echo "$FOLDER" | $MD5 | $CUT -d' ' -f1)
+    if [ -z $($LXC config device show $CONTAINER_NAME | $GREP "$NAME:") ];then
+        echo "[ERROR] : '$FOLDER' is not shared with $CONTAINER_NAME"
+    fi
+    
+    # keep track of all shared folders
+    echo $($GREP -v "$CONTAINER_NAME:$FOLDER" "$SF_DIR/list") > "$SF_DIR/list"
+    # remove ACL
+    $SETFACL -bR $FOLDER
+    # Remove device
+    $LXC config device remove $CONTAINER_NAME $NAME
+
+}
+
+function shared_folder_list {
+    CONTAINER_NAME=$1
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    for LINE in $($GREP "$CONTAINER_NAME:" "$SF_DIR/list"); do
+        FOLDER=$(echo $LINE | $CUT -d':' -f2)
+        PERMS=$(echo $LINE | $CUT -d':' -f3)
+
+        echo "$FOLDER <- permissions: $PERMS"
+    done
+}
+
+
+function shared_folder {
+    CONTAINER_NAME=$1
+    ACTION=$2
+    FOLDER=$3
+    CONTAINER_FOLDER=$4
+    PERMS=$5
+
+    if [ ! -d "$SF_DIR" ]; then
+        echo "Configuration directory for shared folder does not exist, creating ..."
+        $MKDIR -p "$SF_DIR"
+    fi
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    test=$($LXC list | $GREP "| $1 ")
+    if [ -z "$test" ] ; then
+        echo "[ERROR] : unknown container $1"
+        return
+    fi
+    if [ "$ACTION" = "add" ];then
+        shared_folder_add $CONTAINER_NAME $FOLDER $CONTAINER_FOLDER $PERMS  
+    elif [ "$ACTION" = "remove" ];then
+        shared_folder_remove $CONTAINER_NAME $FOLDER  
+    elif [ "$ACTION" = "list" ];then
+        shared_folder_list $CONTAINER_NAME
+    else
+        echo "[ERROR] : Unkown action '$ACTION'"
+        return
+    fi
+
+}
+
+
+######### SHARED FOLDER #########
+
+## MAIN ##
+
 A=($@)
 B="${A[@]:1}"
 
 if [ "$1" = "network" ];then
     network $B
+elif [ "$1" = "system" ];then
+    system $B
+elif [ "$1" = "shared_folder" ];then
+    shared_folder $B
 else
     echo "Unknown action $1"
 fi
