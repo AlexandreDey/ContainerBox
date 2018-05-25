@@ -1,21 +1,21 @@
 ContainerBox 
 ============
 
-What is it ?
-------------
-  A tool on top of LXD to easily create and use containers with full graphical capacity (a display manager and a desktop environment)
+What is it?
+-----------
+  A tool on top of LXD to easily create and use containers with full graphical capability (a display manager and a desktop environment)
   
-Why ?
------
-  The main idea is to have the usability from virtualization tools like VirtualBox but without the overhead of running inside a VM. Unprivilleged LXC containers allow for near 0 overhead while still maintaining reasonnable isolation
+Why?
+----
+  The main idea is to have the usability from virtualization tools like VirtualBox but without the overhead of running inside a VM. Unprivilleged LXC containers allow for near 0 overhead while still maintaining reasonnable isolation.
 
-How it works ?
---------------
-  Expose the host managed resources to the container when the latter is not able to manage them (ex: starting a display server)
-  Security is kept in mind so everything that needs to run on the host is isolated as much as possible (ex: nested Xorg server run as unprivilleged user) 
+How does it work?
+-----------------
+   The host managed resources are exposed to the container when the latter is not able to manage them (ex: starting a display server).
+  Security is kept in mind so everything that needs to run on the host is isolated as much as possible (ex: nested Xorg server run as unprivilleged user) .
  
-Usage:
-------
+Usage
+-----
 -  **Install**
 + Install *lxd* and *xephyr* (and *xpra* if you want) on your host 
 + Run install.sh
@@ -29,15 +29,15 @@ Usage:
 -  **Configure a container**
 + ContainerBox config  network|system(WIP)|shared_folder(WIP) NAME_OF_CONTAINER(required) [ OPTIONS ]
  
-TODO List (from priority to eventuality)
-----------------------------------------
+TODO List (in order of priority)
+--------------------------------
 - Enable sound (pulseaudio server on the host and/or ALSA in the container with /dev/snd passthrough)
-- Easy exposure of network(DONE) and resources configuration
+- Easy exposure of resources configuration
 - Shared folder 
 - Create a nice GUI on top of the CLI
 - Backup/snapshot
-- install from an ISO image (maybe use QEMU to perform the install and then use the rootfs with LXD)
-- opened to any suggestion as long as it can be done through LXD/LXC
+- Install from an ISO image (maybe use QEMU to perform the install and then use the rootfs with LXD)
+- Your suggestions (as long as it can be done through LXD/LXC)
 
 AUTHOR:
 -------
