@@ -483,6 +483,20 @@ function system_memory {
     fi
 }
 
+function system_usage {
+    echo "ContainerBox config system CONTAINER_NAME CATEGORY(cpu|memory) ACTION [OPTIONS]:"
+    echo 'ACTION:'
+    echo -e "\tget: get current limits"
+    echo ""
+    echo -e "\tset: set new limit"
+    echo -e "\t\tContainerBox config system CONTAINER_NAME CATEGORY(cpu|memory) set SUBJECT LIMIT"
+    echo -e "\t\tSUBJECT for memory:"
+    echo -e "\t\t\tmax: maximum amount of RAM in MB"
+    echo -e "\t\t\tswap: enable (true) or disable(false) swap"
+    echo -e "\t\tSUBJECT for cpu:"
+    echo -e "\t\t\tcores: maximum number of cpu cores"
+    echo -e "\t\t\texec_cap: max percentage of cpu usage if resources are required"
+} 
 
 function system {
     CONTAINER_NAME=$1
@@ -492,7 +506,7 @@ function system {
     LIMIT=$5
       
     if [ -z "$1" ] || [ "none" = "$1" ]; then
-        echo "[ERROR] : Container name mandatory"
+        system_usage
         return
     fi
     test=$($LXC list | $GREP "| $1 ")
@@ -600,6 +614,18 @@ function shared_folder_list {
 }
 
 
+function shared_folder_usage {
+    echo "ContainerBox config shared_folder CONTAINER_NAME ACTION [OPTIONS]:"
+    echo 'ACTION:'
+    echo -e "\tlist: list folders currently shared with container"
+    echo ""
+    echo -e "\tadd: share a new folder"
+    echo -e "\t\tContainerBox config shared_folder CONTAINER_NAME add SOURCE_FOLDER CONTAINER_FOLDER_NAME PERMISSIONS"
+    echo ""
+    echo -e "\tremove: unshare a folder"
+    echo -e "\t\tContainerBox config shared_folder CONTAINER_NAME remove SOURCE_FOLDER"
+} 
+
 function shared_folder {
     CONTAINER_NAME=$1
     ACTION=$2
@@ -612,7 +638,7 @@ function shared_folder {
         $MKDIR -p "$SF_DIR"
     fi
     if [ -z "$1" ] || [ "none" = "$1" ]; then
-        echo "[ERROR] : Container name mandatory"
+        shared_folder_usage     
         return
     fi
     test=$($LXC list | $GREP "| $1 ")

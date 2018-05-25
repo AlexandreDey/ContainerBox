@@ -16,7 +16,7 @@ function usage {
 
     echo "-----------------------"
     echo "Configure a container: "
-    echo "ContainerBox config  network|system(WIP)|shared_folder(WIP) NAME_OF_CONTAINER(required) [ OPTIONS ]  "
+    echo "ContainerBox config  network|system|shared_folder NAME_OF_CONTAINER(required) [ OPTIONS ]  "
 }
 
 if [ "$1" = "create" ]; then
