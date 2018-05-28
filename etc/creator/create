@@ -54,7 +54,7 @@ case $key in
     shift # past argument
     shift # past value
     ;;
-    --xpra)
+    -x|--xpra)
     if [ "$2" = "yes" ] || [ "$2" = "no" ]; then
         XPRA="$2"
     else

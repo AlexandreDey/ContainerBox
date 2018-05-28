@@ -8,7 +8,7 @@ BASH=/bin/bash
 
 function usage {
     echo "Create a new container:"
-    echo "ContainerBox create -n NAME_OF_CONTAINER(required) -t DISTRO_TO_USE (ubuntu debian fedora -- default: fedora) -d DESKTOP_ENVIRONMENT(KDE GNOME XFCE MATE -- default: XFCE) --x yes|no (experimental xpra support -- default:no)"
+    echo "ContainerBox create -n NAME_OF_CONTAINER(required) -t DISTRO_TO_USE (ubuntu debian fedora -- default: fedora) -d DESKTOP_ENVIRONMENT(KDE GNOME XFCE MATE -- default: XFCE) -x yes|no (experimental xpra support -- default:no)"
 
     echo "-----------------------"
     echo "Start a container: "
