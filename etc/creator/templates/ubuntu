@@ -48,6 +48,9 @@ function finish_install {
     $LXC exec $1 -- apt install -yq lightdm lightdm-gtk-greeter
     $LXC exec $1 -- apt install -yq sudo
 
+    # Bug with numlockx that crashes lighdm on startup
+    $LXC exec $1 -- rm /usr/share/lightdm/lightdm.conf.d/50-xubuntu-numlock.conf
+
     $LXC exec $1 -- mkdir /etc/lightdm/lightdm.conf.d/
     $LXC file push $CONF $1/etc/lightdm/lightdm.conf.d/
     $LXC exec $1 -- bash -c "echo 'greeter-session=lightdm-gtk-greeter' >> /etc/lightdm/lightdm.conf.d/10_container_box.conf"
