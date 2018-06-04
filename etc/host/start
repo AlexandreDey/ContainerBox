@@ -9,7 +9,7 @@ CHMOD=/bin/chmod
 CHOWN=/bin/chown
 XORG=/usr/bin/Xorg
 SUDO=/usr/bin/sudo
-CUT=/bin/cut
+CUT=/usr/bin/cut
 GREP=/bin/grep
 
 echo "$@"
@@ -52,8 +52,7 @@ function launch_xorg {
 }
 
 function create_xephyr {
-    echo $2
-    $CHROOT $XEPHYR ":$2" $3 -glamor -resizeable -br -terminate -noreset +extension GLX +extension RANDR +extension RENDER
+    $CHROOT $XEPHYR ":$2" $3 -glamor -title "ContainerBox -- $1" -resizeable -br -terminate -noreset +extension GLX +extension RANDR +extension RENDER
 	wait 
 	# Remove the device once host is disconnected
 	$LXC config device remove $1 "X$2"
@@ -103,13 +102,13 @@ function create_xpra {
 function launch_xpra {
     create_xpra $1
     lxdip=$($LXC list | $GREP "| $1 " | $CUT -d'|' -f4 | $CUT -d' ' -f2)
-    xpra attach tcp/$lxdip:10000 --opengl --encoding=rgb &
+    xpra attach tcp/$lxdip:10000 --encoding=rgb --speed=100 &
 }
 
 function launch_xpra_fullscreen {
     create_xpra $1
     lxdip=$($LXC list | $GREP "| $1 " | $CUT -d'|' -f4 | $CUT -d' ' -f2)
-    xpra attach tcp/$lxdip:10000 --opengl --encoding=rgb --desktop-fullscreen=True &
+    xpra attach tcp/$lxdip:10000 --encoding=rgb --speed=100 --desktop-fullscreen=True &
 }
 
 function start_lightdm {
@@ -134,9 +133,16 @@ function launch {
     if [ "$3" = "no" ] && [ "$2" = "xpra" ]; then
         launch_xpra $1
     fi
+    if [ "$3" = "no" ] && [ "$2" = "xorg" ]; then
+        launch_xorg $1
+    fi
 
     # launch lightdm
     start_lightdm $1
+    if [ "$2" = "xpra" ]; then
+        $LXC exec $1 -- killall Xorg
+    fi
+    
 
 }
 

@@ -1,0 +1,122 @@
+#!/bin/bash
+
+KWIN='/usr/bin/kwin_wayland --windowed --xwayland'
+LXC=/usr/bin/lxc
+LS=/bin/ls  
+GREP=/bin/grep
+CUT=/usr/bin/cut
+CBOX=/etc/ContainerBox
+SUDO=/usr/bin/sudo
+LXC_USER=$($GREP "lxd" /etc/subuid | $CUT -d':' -f2)
+
+function get_last_display {
+    str1=$(ls /tmp/.X11-unix/ | tail -n1)
+    str2=""
+
+    echo "${str1/X/$str2}"
+}
+
+function check_display() {
+    test=$($LS /run/user/$UID/wayland-$1)
+    if [ -z "$test" ]; then
+        echo "False"
+        return
+    fi
+    echo "True"
+}
+
+function add_display() {
+    if [ "$(check_display $1)" != "True" ]; then
+        $KWIN -s wayland-$1 &
+        sleep 2
+    fi
+    # has the device been created
+    if [ "$(check_display $1)" != "True" ]; then
+        echo "False"
+        return
+    fi
+
+    lastX=$(get_last_display)
+    echo $lastX
+
+    $SUDO $CBOX/helpers/passthrough $UID $1 /run/user/$UID/wayland-$1 /run/user/$UID/wayland-0
+    # Xwayland screen
+    DISPLAY=:$lastX xhost +local:
+    $LXC config device add $1 Xwl disk source=/tmp/.X11-unix/X$lastX path=/tmp/.X11-unix/X0
+
+    echo "True"
+
+}
+
+function launch_app() {
+
+    # check if uid exists in container
+    test=$($LXC exec $1 -- getent passwd $UID)
+    if [ -z "$test" ]; then
+        # create user
+        $LXC exec $UID -- useradd ephemeral$UID --uid $UID --create-home --groups video
+    fi
+
+    $LXC exec $1 -- su --login "$(echo $test | $CUT -d':' -f1)" -c "export DISPLAY=:0 && $2"
+
+    $LXC config device remove $1 wl0
+    $LXC config device remove $1 Xwl
+
+}
+
+function launch() {
+
+    # if there is a host wayland, passthrough this one instead
+    if [ "$XDG_SESSION_TYPE" = "wayland" ] && [ ! -z $WAYLAND_DISPLAY ] ; then
+        $SUDO $CBOX/helpers/passthrough $UID $1 /run/user/$UID/$WAYLAND_DISPLAY /run/user/$UID/wayland-0
+        # Xwayland screen
+        lastX=$(get_last_display)
+        $LXC config device add $1 Xwl disk source=/tmp/.X11-unix/X$lastX path=/tmp/.X11-unix/X0
+    else 
+        add_display $1
+    fi
+    launch_app $1 "$2"
+}
+
+function usage() {
+    echo "$1 NAME_OF_BOX \"command arg1 arg2 ... argN\""
+    echo "--help [-h]: show this help"
+}
+
+NAME=$1
+COM=$2
+
+if [ -z $NAME ]; then
+    echo "Provide at least the name of the box and the command to execute"
+    usage $0
+    exit 
+fi
+if [ "$NAME" = "--help" ] || [ "$NAME" = "-h" ];then
+    usage $0
+    exit 
+fi
+
+# Check if container exists
+testing_life=$($LXC list | $GREP "| $NAME ")
+if [ -z  "$testing_life" ]; then
+    echo "$NAME does not exist !"
+    exit
+fi
+
+# Start container if not running 
+testing_life=$($LXC list | $GREP "| $NAME " | $GREP "RUNNING")
+if [ -z "$testing_life" ]; then
+    $LXC start $NAME
+fi
+testing_life=$($LXC list | $GREP "| $NAME " | $GREP "RUNNING")
+if [ -z "$testing_life" ]; then
+    echo "[ERROR] : Unable to start container"
+    exit
+fi
+
+if [ -z "$COM" ]; then
+    echo "Provide the command to execute"
+    exit 
+fi
+
+launch $NAME "$COM"

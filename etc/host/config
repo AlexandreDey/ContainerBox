@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 LXC=/usr/bin/lxc
 CUT=/usr/bin/cut
