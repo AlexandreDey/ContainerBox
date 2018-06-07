@@ -25,6 +25,7 @@ function check_display() {
     echo "True"
 }
 
+SETFACL=/usr/bin/setfacl
 function add_display() {
     if [ "$(check_display $1)" != "True" ]; then
         $KWIN -s wayland-$1 &
@@ -39,7 +40,8 @@ function add_display() {
     lastX=$(get_last_display)
     echo $lastX
 
-    $SUDO $CBOX/helpers/passthrough $UID $1 /run/user/$UID/wayland-$1 /run/user/$UID/wayland-0
+    $SETFACL -m u:$(($LXC_USER + $UID)):rwx,g:$(($LXC_USER + $UID)):rwx $PULSE_PATH
+    $LXC config device add $1 wl0 disk source=/run/user/$UID/wayland-$1 path=run/user/$UID/wayland-0
     # Xwayland screen
     DISPLAY=:$lastX xhost +local:
     $LXC config device add $1 Xwl disk source=/tmp/.X11-unix/X$lastX path=/tmp/.X11-unix/X0

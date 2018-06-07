@@ -662,10 +662,111 @@ function shared_folder {
 
 ######### SHARED FOLDER #########
 
+######### SOUND CARD #########
+
+function sound_snd_disable {
+    CONTAINER_NAME=$1
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    for dev in $($LXC config device list $CONTAINER_NAME); do
+        if [[ $dev = "dev_snd_"* ]]; then
+            $LXC config device remove $CONTAINER_NAME $dev
+        fi
+    done
+}
+
+FIND=/usr/bin/find
+function sound_snd_enable {
+    CONTAINER_NAME=$1
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    for dev in $($FIND /dev/snd -maxdepth 1 -type c | $CUT -d'/' -f4); do
+        $LXC config device add $CONTAINER_NAME "dev_snd_$dev" unix-char source=/dev/snd/$dev path=/dev/snd/$dev
+    done
+    $LXC exec $CONTAINER_NAME -- chown -R root:audio /dev/snd/
+}
+
+RM=/bin/rm
+function sound_pa_disable {
+    CONTAINER_NAME=$1
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    PULSE_PATH=~/.ContainerBox/$1-pulse    
+
+    $LXC config device remove $1 pulse
+    $RM $PULSE_PATH
+}
+
+PACTL=/usr/bin/pactl
+function sound_pa_enable {
+    CONTAINER_NAME=$1
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    PULSE_PATH=~/.ContainerBox/$1-pulse
+
+    $PACTL load-module module-native-protocol-unix auth-anonymous=1 socket=$PULSE_PATH
+    $SETFACL -m u:$LXC_USER:rwx,g:$LXC_USER:rwx $PULSE_PATH
+    $LXC config device add $CONTAINER_NAME pulse disk source=$PULSE_PATH path=/tmp/pulse_socket
+}
+
+
+function sound_usage {
+    echo "ContainerBox config sound CONTAINER_NAME ACTION [OPTIONS]:"
+    echo 'ACTION:'
+    echo -e "\tpa_enable: Passthrough host PulseAudio socket to the container (/tmp/pulse_socket)"
+    echo -e "\tpa_disable: Remove host PulseAudio socket from the container"
+    echo ""
+    echo -e "\tsnd_enable: Passthrough the sound cards inside container"
+    echo -e "\tsnd_disable: Remove the sound cards from the container"
+}
+function sound {
+    CONTAINER_NAME=$1
+    ACTION=$2
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Action name mandatory"
+        return
+    fi
+    if [ "$2" = "snd_enable" ]; then
+        sound_snd_enable $CONTAINER_NAME
+    
+    elif [ "$2" = "snd_disable" ]; then
+        sound_snd_disable $CONTAINER_NAME
+    
+    elif [ "$2" = "pa_enable" ]; then
+        sound_pa_enable $CONTAINER_NAME
+    
+    elif [ "$2" = "pa_disable" ]; then
+        sound_pa_disable $CONTAINER_NAME
+    
+    else
+        sound_usage
+    fi
+}
+
+######### SOUND CARD #########
+
+
 ## MAIN ##
 
 A=($@)
 B="${A[@]:1}"
+
 
 if [ "$1" = "network" ];then
     network $B
@@ -673,6 +774,8 @@ elif [ "$1" = "system" ];then
     system $B
 elif [ "$1" = "shared_folder" ];then
     shared_folder $B
+elif [ "$1" = "sound" ];then
+    sound $B
 else
     echo "Unknown action $1"
 fi

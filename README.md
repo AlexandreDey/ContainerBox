@@ -26,13 +26,15 @@ Usage
 -  **Start a container**
 + ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!!security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)
 
+-  **GPU accelerated app in container**
++ ContainerBox runapp NAME "command arg1 arg2 ... argN"
+
 -  **Configure a container**
-+ ContainerBox config  network|system|shared_folder NAME_OF_CONTAINER(required) [ OPTIONS ]
++ ContainerBox config network|system|shared_folder|sound NAME_OF_CONTAINER(required) [ OPTIONS ]
  
 TODO List (in order of priority)
 --------------------------------
-- Enable sound (pulseaudio server on the host and/or ALSA in the container with /dev/snd passthrough)
-- Create a nice GUI on top of the CLI
+- Create a nice GUI on top of the CLI (WIP)
 - Backup/snapshot
 - Install from an ISO image (maybe use QEMU to perform the install and then use the rootfs with LXD)
 - Your suggestions (as long as it can be done through LXD/LXC)
