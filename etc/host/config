@@ -26,6 +26,7 @@ function create_lxdNAT_network {
             return
         fi
     fi
+     echo "New internal network bridge $DEVICE_HOST_NAME successfully created"
 }
 function create_lxd_network {
     DEVICE_HOST_NAME=$1
@@ -41,6 +42,7 @@ function create_lxd_network {
             return
         fi
     fi
+    echo "New network bridge $DEVICE_HOST_NAME successfully created"
 }
 
 
@@ -124,6 +126,8 @@ function network_add {
     if [ "$TYPE" = "physical" ]; then
         $LXC config device add $CONTAINER_NAME $DEVICE_CONTAINER_NAME nic nictype=physical parent=$DEVICE_HOST_NAME
     fi
+
+    network_get $CONTAINER_NAME $DEVICE_CONTAINER_NAME
 
 
 }
@@ -563,8 +567,8 @@ function shared_folder_add {
     
 
     # Set ACL so that root in container can use the directory
-    $SETFACL -Rm user:lxd:rwx,default:user:lxd:rwx,user:$LXC_USER:$PERMS,default:user:$LXC_USER:$PERMS $FOLDER
-    # keep track of all shared folders
+    $SETFACL -Rm user:lxd:rwx,default:user:lxd:rwx,user:$LXC_USER:$PERMS,default:group:$LXC_USER:$PERMS $FOLDER
+    # keep track of all shared folders  
     echo "$CONTAINER_NAME:$FOLDER:$PERMS" >> "$SF_DIR/list"
 
     $LXC config device add $CONTAINER_NAME $NAME disk source=$FOLDER path=$CONTAINER_FOLDER

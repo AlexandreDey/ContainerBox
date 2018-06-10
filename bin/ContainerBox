@@ -26,6 +26,8 @@ function usage {
 
 if [ "$1" = "create" ]; then
     $BASH $CONFIG/creator/create $B
+elif [ "$1" = "import" ]; then
+    $BASH $CONFIG/creator/import $B
 elif [ "$1" = "start" ]; then
     $BASH $CONFIG/host/start $B
 elif [ "$1" = "config" ]; then
