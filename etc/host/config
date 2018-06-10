@@ -233,7 +233,7 @@ function network_list {
 }
 
 function network_usage {
-    echo "ContainerBox config network ACTION CONTAINER_NAME [OPTIONS]:"
+    echo "ContainerBox config network CONTAINER_NAME ACTION [OPTIONS]:"
     echo -e "\tlist: list all network interfaces for this container"
     echo ""
     echo -e "\tget: get information for a particular interface"
@@ -253,8 +253,8 @@ function network_usage {
 } 
 
 function network {
-    ACTION=$1
-    NAME=$2
+    ACTION=$2
+    NAME=$1
     if [ -z "$1" ] || [ "none" = "$1" ] ; then
         network_usage
         exit
@@ -263,28 +263,27 @@ function network {
         echo "[ERROR] : Provide a container name"
         exit
     fi
-    test=$($LXC list | $GREP ' $2 ')
+    test=$($LXC list | $GREP " $2 ")
     if [ ! -z "$test" ] ; then
         echo "[ERROR] : unknown container $2"
         exit
     fi
     A=($@)
-    B="${A[@]:1}"
+    B="${A[@]:2}"
     if [ "$ACTION" = "list" ];then
-        network_list $B
+        network_list $NAME
+    elif [ "$ACTION" = "get" ];then
+        network_get $NAME $B
+    elif [ "$ACTION" = "set" ];then
+        network_set $NAME $B
+    elif [ "$ACTION" = "add" ];then   
+        network_add $NAME $B
+    elif [ "$ACTION" = "remove" ];then
+        network_remove $NAME $B
+    else
+        echo "Unknown option $ACTION"
     fi
-    if [ "$ACTION" = "get" ];then
-        network_get $B
-    fi
-    if [ "$ACTION" = "set" ];then
-        network_set $B
-    fi
-    if [ "$ACTION" = "add" ];then
-        network_add $B
-    fi
-    if [ "$ACTION" = "remove" ];then
-        network_remove $B
-    fi
+
 }
 
 ######### NETWORK #########
@@ -766,7 +765,6 @@ function sound {
 
 A=($@)
 B="${A[@]:1}"
-
 
 if [ "$1" = "network" ];then
     network $B

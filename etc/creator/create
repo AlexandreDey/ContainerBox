@@ -1,7 +1,7 @@
 #!/bin/bash
 LXC=/usr/bin/lxc
 BASH=/bin/bash
-
+GREP=/bin/grep
 CB_CONF=/etc/ContainerBox
 
 CONFIG_DIR="$CB_CONF/creator"
@@ -90,7 +90,7 @@ if [ ! -f "$CONFIG_DIR/templates/$TEMPLATE" ]; then
     echo "Template '$TEMPLATE' does not exist. You can create it if you want and place the file in the '$(pwd)/$CONFIG_DIR' folder"
 fi
 
-if [ "$DE" != "XFCE" ] && [ "$DE" != "MATE" ] && [ "$DE" != "KDE" ] && [ "$DE" != "GNOME" ] && [ "$DE" != "none" ]; then
+if [ "$TEMPLATE" != "vanilla" ] && [ "$DE" != "XFCE" ] && [ "$DE" != "MATE" ] && [ "$DE" != "KDE" ] && [ "$DE" != "GNOME" ] && [ "$DE" != "none" ]; then
     echo "Desktop Environment $DE is not supported (yet?). You can contact me if you want it to be added."
     echo "In the meantime, you can set the Desktop Environment parameter to 'none' and install yours after"
     exit
@@ -116,4 +116,9 @@ else
     CB_CONF=$CB_CONF $BASH $CONFIG_DIR/templates/$TEMPLATE $NAME $DE
 fi
 
+test=$($LXC list | $GREP " $NAME ")
+if [ "$test" = *"$NAME"* ] ; then
+    echo "[ERROR] : Failed to create container $NAME"
+    exit
+fi
 finish_setup $NAME $USER $PASSWORD
