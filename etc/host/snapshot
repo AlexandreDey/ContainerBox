@@ -1,0 +1,183 @@
+#!/bin/bash
+
+LXC=/usr/bin/lxc
+CUT=/usr/bin/cut
+GREP=/bin/grep
+MV=/bin/mv
+SED=/bin/sed
+
+function save_state {
+    CONTAINER_NAME=$1
+    SNAP_NAME=$2
+
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Snapshot name mandatory"
+        return
+    fi  
+
+    $LXC snapshot $CONTAINER_NAME $SNAP_NAME --stateful
+}
+
+function restore_state {
+    CONTAINER_NAME=$1
+    SNAP_NAME=$2
+
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Snapshot name mandatory"
+        return
+    fi  
+
+    $LXC restore $CONTAINER_NAME $SNAP_NAME --stateful
+}
+
+function create {
+    CONTAINER_NAME=$1
+    SNAP_NAME=$2
+
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Snapshot name mandatory"
+        return
+    fi  
+
+    $LXC snapshot $CONTAINER_NAME $SNAP_NAME
+}
+
+function restore {
+    CONTAINER_NAME=$1
+    SNAP_NAME=$2
+
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Snapshot name mandatory"
+        return
+    fi  
+
+    $LXC restore $CONTAINER_NAME $SNAP_NAME
+}
+
+function tarball_export {
+    CONTAINER_NAME=$1
+    BACKUP_NAME=$2
+
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Backup filename mandatory"
+        return
+    fi  
+
+    $LXC snapshot $CONTAINER_NAME backup
+    $LXC publish $CONTAINER_NAME/backup --alias $CONTAINER_NAME-backup --compression none
+    FINGERPRINT=$($LXC image export $CONTAINER_NAME-backup | $CUT -d' ' -f5)
+    $lxc image delete $CONTAINER_NAME-backup
+    $MV "$FINGERPRINT.tar.gz" $BACKUP_NAME
+    
+}
+
+function import {
+    CONTAINER_NAME=$1
+    BACKUP_NAME=$2
+
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+
+    if [ -z "$2" ] || [ "none" = "$2" ]; then
+        echo "[ERROR] : Backup filename mandatory"
+        return
+    fi  
+
+    $LXC image import $BACKUP_NAME --alias $CONTAINER_NAME-backup
+    $LXC launch $CONTAINER_NAME-backup $CONTAINER_NAME
+    $LXC image delete $CONTAINER_NAME-backup
+}
+
+function list {
+    CONTAINER_NAME=$1
+    if [ -z "$1" ] || [ "none" = "$1" ]; then
+        echo "[ERROR] : Container name mandatory"
+        return
+    fi
+    LIST=$($LXC info $CONTAINER_NAME | $SED -n -e '/Snapshots:/,$p' | $GREP -v "Snapshots:")
+
+    BACKUP_POINT=$(echo -e "$LIST" | $GREP "(stateless)")
+    STATEFUL_POINT=$(echo -e "$LIST" | $GREP -v "(stateless)")
+
+    IFS=$'\t\n'
+    echo "Restore points for $CONTAINER_NAME:"
+    for backup in $BACKUP_POINT; do
+        BACK_NAME=$(echo $backup | $CUT -d'(' -f1)
+        DATE=$(echo $backup | $CUT -d'(' -f2 | $CUT -d')' -f1)
+        echo "$BACK_NAME - $DATE" 
+    done
+    echo "Saved sessions for $CONTAINER_NAME:"
+    for backup in $STATEFUL_POINT; do
+        BACK_NAME=$(echo $backup | $CUT -d'(' -f1)
+        DATE=$(echo $backup | $CUT -d'(' -f2 | $CUT -d')' -f1)
+        echo "$BACK_NAME - $DATE" 
+    done
+    IFS=$' \t\n'
+}
+
+if [ -z "$1" ] || [ "none" = "$1" ]; then
+    echo "[ERROR] : Container name mandatory"
+    return
+fi
+
+function usage {
+    
+    echo "ContainerBox snapshot CONTAINER_NAME ACTION [OPTIONS]:"
+    echo 'ACTION:'
+    echo -e "\tcreate: Create a backup of CONTAINER_NAME named OPTIONS"
+    echo -e "\trestore: Restore a backup of CONTAINER_NAME named OPTIONS"
+    echo ""
+    echo -e "\tsave_state: Save the current session state of CONTAINER_NAME as OPTIONS"
+    echo -e "\trestore_state: Restore current session state of CONTAINER_NAME from OPTIONS"
+    echo ""
+    echo -e "\texport: Export CONTAINER_NAME as a tarball named OPTIONS"
+    echo -e "\timport: Import CONTAINER_NAME from a tarball named OPTIONS"
+    echo ""
+    echo -e "\tlist: List backup and saved states of CONTAINER_NAME"
+}
+
+if [ "$2" = "create" ]; then
+    create $1 $3
+elif [ "$2" = "restore" ]; then
+    restore $1 $3
+elif [ "$2" = "save_state" ]; then
+    save_state $1 $3
+elif [ "$2" = "restore_state" ]; then
+    restore_state $1 $3
+elif [ "$2" = "export" ]; then
+    tarball_export $1 $3
+elif [ "$2" = "import" ]; then
+    import $1 $3
+elif [ "$2" = "list" ]; then
+    list $1
+else
+    usage
+    exit
+fi

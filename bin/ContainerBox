@@ -12,6 +12,10 @@ function usage {
     echo "ContainerBox create -n NAME_OF_CONTAINER(required) -t DISTRO_TO_USE (ubuntu debian fedora -- default: fedora) -d DESKTOP_ENVIRONMENT(KDE GNOME XFCE MATE -- default: XFCE) -x yes|no (experimental xpra support -- default:no)"
 
     echo "-----------------------"
+    echo "Create a container from a template file:"
+    echo "ContainerBox import NAME_OF_CONTAINER(required) PATH_TO_TEMPLATE_FILE"
+
+    echo "-----------------------"
     echo "Start a container: "
     echo "ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!! security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)"
 
@@ -22,6 +26,11 @@ function usage {
     echo "-----------------------"
     echo "Configure a container: "
     echo "ContainerBox config  network|system|shared_folder|sound NAME_OF_CONTAINER(required) [ OPTIONS ]  "
+
+    echo "-----------------------"
+    echo "Take snapshots of containers:"
+    echo "ContainerBox snapshot NAME_OF_CONTAINER(required) create|restore|save_state|restore_state|export|import|list [OPTIONS]"
+
 }
 
 if [ "$1" = "create" ]; then
@@ -34,6 +43,8 @@ elif [ "$1" = "config" ]; then
     $BASH $CONFIG/host/config $B
 elif [ "$1" = "runapp" ]; then
     $BASH $CONFIG/host/runapp $2 "$3"
+elif [ "$1" = "snapshot" ]; then
+    $BASH $CONFIG/host/snapshot $B
 else
     echo "Unknown option $1"
     usage
