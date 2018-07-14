@@ -12,8 +12,6 @@ SUDO=/usr/bin/sudo
 CUT=/usr/bin/cut
 GREP=/bin/grep
 
-echo "$@"
-
 function usage {
     echo "$1 --name(-n) NAME_OF_BOX --fullscreen(-f) yes|no --method(-m) xephyr|xpra|cli"
     echo "--name [-n]: Name of the box to launch"

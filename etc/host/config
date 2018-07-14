@@ -636,10 +636,6 @@ function shared_folder {
     CONTAINER_FOLDER=$4
     PERMS=$5
 
-    if [ ! -d "$SF_DIR" ]; then
-        echo "Configuration directory for shared folder does not exist, creating ..."
-        $MKDIR -p "$SF_DIR"
-    fi
     if [ -z "$1" ] || [ "none" = "$1" ]; then
         shared_folder_usage     
         return
@@ -739,10 +735,12 @@ function sound {
     ACTION=$2
     if [ -z "$1" ] || [ "none" = "$1" ]; then
         echo "[ERROR] : Container name mandatory"
+        sound_usage
         return
     fi
     if [ -z "$2" ] || [ "none" = "$2" ]; then
         echo "[ERROR] : Action name mandatory"
+        sound_usage
         return
     fi
     if [ "$2" = "snd_enable" ]; then
@@ -767,6 +765,37 @@ function sound {
 
 ## MAIN ##
 
+function main_usage {
+    echo "Usage for 'ContainerBox config network':"    
+    network_usage
+    echo "-----------------------------------"
+    echo "-----------------------------------"
+    echo ""
+
+    echo "Usage for 'ContainerBox config system':" 
+    system_usage
+    echo "-----------------------------------"
+    echo "-----------------------------------"
+    echo ""
+
+    echo "Usage for 'ContainerBox config shared_folder':" 
+    shared_folder_usage
+    echo "-----------------------------------"
+    echo "-----------------------------------"
+    echo ""
+
+    echo "Usage for 'ContainerBox config sound':" 
+    sound_usage
+    echo "-----------------------------------"
+    echo "-----------------------------------"
+    echo ""
+}
+
+if [ ! -d "$SF_DIR" ]; then
+    echo "ContainerBox configuration directory for this user does not exist, creating ..."
+    $MKDIR -p "$SF_DIR"
+fi
+
 A=($@)
 B="${A[@]:1}"
 
@@ -780,4 +809,7 @@ elif [ "$1" = "sound" ];then
     sound $B
 else
     echo "Unknown action $1"
+
+    main_usage
+
 fi
