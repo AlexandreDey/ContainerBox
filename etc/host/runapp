@@ -38,13 +38,12 @@ function add_display() {
     fi
 
     lastX=$(get_last_display)
-    echo $lastX
 
     $SETFACL -m u:$(($LXC_USER + $UID)):rwx,g:$(($LXC_USER + $UID)):rwx $PULSE_PATH
-    $LXC config device add $1 wl0 disk source=/run/user/$UID/wayland-$1 path=run/user/$UID/wayland-0
+    $LXC config device add $1 wl0 proxy connect="unix:@/run/user/$UID/wayland-$1" listen="unix:@/run/user/$UID/wayland-0" bind=container
     # Xwayland screen
     DISPLAY=:$lastX xhost +local:
-    $LXC config device add $1 Xwl disk source=/tmp/.X11-unix/X$lastX path=/tmp/.X11-unix/X0
+    $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
 
     echo "True"
 
@@ -73,7 +72,7 @@ function launch() {
         $SUDO $CBOX/helpers/passthrough $UID $1 /run/user/$UID/$WAYLAND_DISPLAY /run/user/$UID/wayland-0
         # Xwayland screen
         lastX=$(get_last_display)
-        $LXC config device add $1 Xwl disk source=/tmp/.X11-unix/X$lastX path=/tmp/.X11-unix/X0
+        $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
     else 
         add_display $1
     fi

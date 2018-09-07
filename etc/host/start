@@ -44,7 +44,7 @@ function launch_xorg {
 
     # Ensure it is not already passed through
 	$LXC config device remove $1 "X$display"
-	$LXC config device add $1 "X$display" disk path="/tmp/.X11-unix/X0" source="/tmp/.X11-unix/X$display"
+	$LXC config device add $1 "X$display" proxy listen="unix:@/tmp/.X11-unix/X0" connect="unix:@/tmp/.X11-unix/X$display" bind=container
 
 	echo "Display :$display socket passed to $1"
 }
@@ -65,7 +65,7 @@ function launch_xephyr {
 
     # Ensure it is not already passed through
 	$LXC config device remove $1 "X$display"
-	$LXC config device add $1 "X$display" disk path="/tmp/.X11-unix/X0" source="/tmp/.X11-unix/X$display"
+	$LXC config device add $1 "X$display" proxy listen="unix:@/tmp/.X11-unix/X0" connect="unix:@/tmp/.X11-unix/X$display" bind=container
 
 	echo "Display :$display socket passed to $1"
 }
@@ -79,7 +79,7 @@ function launch_xephyr_fullscreen {
 
     # Ensure it is not already passed through
 	$LXC config device remove $1 "X$display"
-	$LXC config device add $1 "X$display" disk path="/tmp/.X11-unix/X0" source="/tmp/.X11-unix/X$display"
+	$LXC config device add $1 "X$display" proxy listen="unix:@/tmp/.X11-unix/X0" connect="unix:@/tmp/.X11-unix/X$display" bind=container
 
 	echo "Display :$display socket passed to $1"
 }
