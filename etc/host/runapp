@@ -80,7 +80,7 @@ function launch() {
 }
 
 function usage() {
-    echo "$1 NAME_OF_BOX \"command arg1 arg2 ... argN\""
+    echo "ContainerBox runapp NAME_OF_BOX \"command arg1 arg2 ... argN\""
     echo "--help [-h]: show this help"
 }
 
@@ -92,7 +92,7 @@ if [ -z $NAME ]; then
     usage $0
     exit 
 fi
-if [ "$NAME" = "--help" ] || [ "$NAME" = "-h" ];then
+if [ "$NAME" = "--help" ] || [ "$NAME" = "-h" ] || [ "$NAME" = "help" ];then
     usage $0
     exit 
 fi

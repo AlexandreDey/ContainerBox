@@ -13,7 +13,8 @@ CUT=/usr/bin/cut
 GREP=/bin/grep
 
 function usage {
-    echo "$1 --name(-n) NAME_OF_BOX --fullscreen(-f) yes|no --method(-m) xephyr|xpra|cli"
+    echo "ContainerBox start --name(-n) NAME_OF_BOX --fullscreen(-f) yes|no --method(-m) xephyr|xpra|cli"
+    echo ""
     echo "--name [-n]: Name of the box to launch"
     echo "--fullscreen [-f]: Launch fullscreen display"
     echo "--method [-m]: Share a xephyr display forward display via xpra or open a new terminal window"
@@ -172,6 +173,11 @@ CMD=$0
 while [[ $# -gt 0 ]]
 do
 key="$1"
+
+if [ "$1" = "help" ]; then
+    usage $0
+    exit
+fi
 
 case $key in
     -m|--method)

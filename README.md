@@ -27,13 +27,21 @@ Usage
 + ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!!security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)
 
 -  **GPU accelerated app in container**
-+ ContainerBox runapp NAME "command arg1 arg2 ... argN"
++ ContainerBox runapp NAME "command arg1 arg2 ... argN" (NOTE: requires to either be running inside a wayland environment, or having kwin_wayland and XWayland installed)
 
 -  **Configure a container**
 + ContainerBox config network|system|shared_folder|sound NAME_OF_CONTAINER(required) [ OPTIONS ]
+
+-  **Take Snapshot of a container**
++ ContainerBox snapshot NAME_OF_CONTAINER(required) create|restore|save_state|restore_state|export|import|list [OPTIONS]
+
+-  **Show Usage**
++ ContainerBox create|config|runapp|snapshot help
  
 TODO List (in order of priority)
 --------------------------------
+- Improve install script (create .deb and .rpm packages ?)
+- Write user documentation
 - Create a nice GUI on top of the CLI (WIP)
 - Install from an ISO image (maybe use QEMU to perform the install the lxd-p2c)
 - Your suggestions (as long as it can be done through LXD/LXC)

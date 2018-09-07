@@ -6,6 +6,18 @@ CB_CONF=/etc/ContainerBox
 
 CONFIG_DIR="$CB_CONF/creator"
 
+function usage {
+    echo "ContainerBox create --template(-t) DISTRO_NAME --desktop_environment(-d) DE_NAME --name(-n) NAME_OF_BOX --xpra(-x) yes|no --user(-u) USERNAME --password(-p) PASSWORD"
+    echo ""
+    echo "--template [-t]: Ditribution template to use (debian, fedora[default], ubuntu or 'vanilla NAME_DISTRO')"
+    echo "--desktop_environment [-d]: Desktop environment to install (MATE, XFCE[default], GNOME or KDE)"
+    echo "--name [-n]: Name of the box to create"
+    echo "--xpra [-x]: Install xpra support (yes or no)"
+    echo "--user [-u]: Main user that will be created and granted admin access [default: 'main']"
+    echo "--password [-p]: Password of the newly created user [default: random 16 char password]"
+    echo "--help [-h]: show this help"
+}
+
 function generate_password {
    PWD=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-16};echo;)
    echo $PWD
@@ -17,7 +29,9 @@ function finish_setup {
 
     # Create the user and set it as a sudoer
     $LXC exec $1 -- groupadd sudo
+    $LXC exec $1 -- groupadd wheel
     $LXC exec $1 -- useradd -m $2 -G sudo
+    $LXC exec $1 -- useradd -a -G wheel $2
 
     # Change password
     $LXC exec $1 -- bash -c "echo -e \"$3\n$3\n\" | passwd $2"
@@ -27,10 +41,16 @@ function finish_setup {
 
 }
 
+if [ "$1" = "help" ]; then
+    usage $0
+    exit
+fi
+
+
 XPRA='no'
 TEMPLATE='fedora'
 DE='XFCE'
-USER='admin'
+USER='main'
 PASSWORD=$(generate_password)
 
 

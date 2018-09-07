@@ -20,7 +20,7 @@ function usage {
     echo "ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!! security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)"
 
     echo "-----------------------"
-    echo "Run a single app inside container (requires to either be running inside a wayland environment, or having kwin_wayland): "
+    echo "Run a single app inside container (NOTE: requires to either be running inside a wayland environment, or having kwin_wayland and XWayland installed): "
     echo "ContainerBox runapp NAME \"command arg1 arg2 ... argN\""
 
     echo "-----------------------"
@@ -45,6 +45,9 @@ elif [ "$1" = "runapp" ]; then
     $BASH $CONFIG/host/runapp $2 "$3"
 elif [ "$1" = "snapshot" ]; then
     $BASH $CONFIG/host/snapshot $B
+elif [ "$1" = "help" ]; then
+    usage
+    exit
 else
     echo "Unknown option $1"
     usage

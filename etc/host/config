@@ -807,6 +807,8 @@ elif [ "$1" = "shared_folder" ];then
     shared_folder $B
 elif [ "$1" = "sound" ];then
     sound $B
+elif [ "$1" = "help" ];then
+    main_usage
 else
     echo "Unknown action $1"
 
