@@ -35,8 +35,7 @@ Usage
 TODO List (in order of priority)
 --------------------------------
 - Create a nice GUI on top of the CLI (WIP)
-- Backup/snapshot
-- Install from an ISO image (maybe use QEMU to perform the install and then use the rootfs with LXD)
+- Install from an ISO image (maybe use QEMU to perform the install the lxd-p2c)
 - Your suggestions (as long as it can be done through LXD/LXC)
 
 AUTHOR:
