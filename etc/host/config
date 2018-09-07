@@ -703,6 +703,8 @@ function sound_pa_disable {
 
     $LXC config device remove $1 pulse
     $RM $PULSE_PATH
+
+    $LXC exec $CONTAINER_NAME -- sed -i '/PULSE_SERVER/d' /etc/profile
 }
 
 PACTL=/usr/bin/pactl
@@ -718,6 +720,9 @@ function sound_pa_enable {
     $PACTL load-module module-native-protocol-unix auth-anonymous=1 socket=$PULSE_PATH
     $SETFACL -m u:$LXC_USER:rwx,g:$LXC_USER:rwx $PULSE_PATH
     $LXC config device add $CONTAINER_NAME pulse disk source=$PULSE_PATH path=/tmp/pulse_socket
+
+    $LXC exec $CONTAINER_NAME -- bash -c "echo 'export PULSE_SERVER=/tmp/pulse_socket' >> /etc/profile"
+
 }
 
 
