@@ -718,7 +718,7 @@ function sound_pa_enable {
     PULSE_PATH=~/.ContainerBox/$1-pulse
 
     $PACTL load-module module-native-protocol-unix auth-anonymous=1 socket=$PULSE_PATH
-    $LXC config device add $CONTAINER_NAME pulse proxy connect="unix:@$PULSE_PATH" listen="unix:@/tmp/pulse_socket" bind=container
+    $LXC config device add $CONTAINER_NAME pulse proxy connect="unix:$PULSE_PATH" listen="unix:/tmp/pulse_socket" mode=0777 bind=container
 
     $LXC exec $CONTAINER_NAME -- bash -c "echo 'export PULSE_SERVER=/tmp/pulse_socket' >> /etc/profile"
 
