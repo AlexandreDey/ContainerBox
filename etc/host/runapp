@@ -1,7 +1,7 @@
 #!/bin/bash
 
 KWIN='/usr/bin/kwin_wayland --windowed --xwayland'
-LXC=/usr/bin/lxc
+LXC=/snap/bin/lxc
 LS=/bin/ls  
 GREP=/bin/grep
 CUT=/usr/bin/cut

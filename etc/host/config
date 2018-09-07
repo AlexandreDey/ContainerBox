@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-LXC=/usr/bin/lxc
+LXC=/snap/bin/lxc
 CUT=/usr/bin/cut
 WC=/usr/bin/wc
 AWK=/usr/bin/awk

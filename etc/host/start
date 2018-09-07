@@ -3,7 +3,7 @@
 CHROOT=""
 XEPHYR=/usr/bin/Xephyr
 XPRA=/usr/bin/xpra
-LXC=/usr/bin/lxc
+LXC=/snap/bin/lxc
 MKDIR=/bin/mkdir
 CHMOD=/bin/chmod
 CHOWN=/bin/chown

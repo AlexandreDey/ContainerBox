@@ -1,7 +1,5 @@
 #!/bin/bash
-
-#!/bin/bash
-LXC=/usr/bin/lxc
+LXC=/snap/bin/lxc
 BASH=/bin/bash
 GREP=/bin/grep
 CUT=/usr/bin/cut

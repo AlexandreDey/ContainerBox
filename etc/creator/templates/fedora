@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LXC=/usr/bin/lxc
+LXC=/snap/bin/lxc
 CONF="$CB_CONF/creator/resources/10_container_box.conf"
 
 function create_container {

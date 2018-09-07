@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LXC=/usr/bin/lxc
+LXC=/snap/bin/lxc
 CUT=/usr/bin/cut
 GREP=/bin/grep
 MV=/bin/mv
