@@ -11,13 +11,14 @@ XORG=/usr/bin/Xorg
 SUDO=/usr/bin/sudo
 CUT=/usr/bin/cut
 GREP=/bin/grep
+REMOTE_VIEWER=/usr/bin/remote-viewer
 
 function usage {
-    echo "ContainerBox start --name(-n) NAME_OF_BOX --fullscreen(-f) yes|no --method(-m) xephyr|xpra|cli --clipboard(-c) no|DISPLAY"
+    echo "ContainerBox start --name(-n) NAME_OF_BOX --fullscreen(-f) yes|no --method(-m) xephyr|xpra|xspice|cli --clipboard(-c) no|DISPLAY"
     echo ""
     echo "--name [-n]: Name of the box to launch"
     echo "--fullscreen [-f]: Launch fullscreen display"
-    echo "--method [-m]: Share a xephyr display, forward display via xpra, or open a new terminal window"
+    echo "--method [-m]: Share a xephyr display, forward display via xpra, forward display via spice, or open a new terminal window"
     echo "--clipboard [-c]: Synchronize guest clipboard and host clipboard specified by DISPLAY"
     echo "--help [-h]: show this help"
 }
@@ -27,6 +28,39 @@ function get_last_display {
     str2=""
 
     echo "${str1/X/$str2}"
+}
+
+function get_spice_port {
+    PORT=5900
+    while [ "$(nmap localhost -p $PORT | $GREP open)" ]; do
+        PORT=$(($PORT+1))
+    done
+    echo $PORT
+}
+function create_xspice {
+    PORT=$2
+    # Launch xspice server
+    $LXC exec $1 -- Xspice --disable-ticketing :0 &>0 &
+    
+    echo "Waiting for server creation"
+    $LXC config device remove $1 spice
+	$LXC config device add $1 spice proxy listen="tcp:localhost:$PORT" connect="tcp:localhost:5900" bind=host
+    while [ -z "$(nmap localhost -p $PORT | $GREP open)" ]; do
+        echo "still closed"
+        sleep 1
+    done
+}
+
+function launch_xspice {
+    PORT=$(get_spice_port)
+    create_xspice $1 $PORT
+    $REMOTE_VIEWER spice://localhost:$PORT -t "ContainerBox -- $1" &
+}
+
+function launch_xspice_fullscreen {
+    PORT=$(get_spice_port)
+    create_xspice $1 $PORT
+    $REMOTE_VIEWER spice://localhost:$PORT --full-screen -t "ContainerBox -- $1" &
 }
 
 function sync_clipboard {
@@ -190,12 +224,19 @@ function launch {
     if [ "$2" = "xpra" ]; then
         $LXC exec $1 -- killall Xorg
     fi
+    # Ensure Xspice has been stopped
+    if [ "$2" = "xspice" ]; then
+        $LXC exec $1 -- killall Xspice
+    fi
     # fullscreen
     if [ "$3" = "yes" ] && [ "$2" = "xephyr" ]; then
         launch_xephyr_fullscreen $1 $4
     fi
     if [ "$3" = "yes" ] && [ "$2" = "xpra" ]; then
         launch_xpra_fullscreen $1
+    fi
+    if [ "$3" = "yes" ] && [ "$2" = "xspice" ]; then
+        launch_xspice_fullscreen $1
     fi
     if [ "$3" = "yes" ] && [ "$2" = "xorg" ]; then
         launch_xorg $1 $4
@@ -206,6 +247,9 @@ function launch {
     fi
     if [ "$3" = "no" ] && [ "$2" = "xpra" ]; then
         launch_xpra $1
+    fi
+    if [ "$3" = "no" ] && [ "$2" = "xspice" ]; then
+        launch_xspice $1
     fi
     if [ "$3" = "no" ] && [ "$2" = "xorg" ]; then
         launch_xorg $1 $4
@@ -240,7 +284,7 @@ fi
 case $key in
     -m|--method)
     METHOD="$2"
-    if [ "$2" = "xephyr" ] || [ "$2" = "xpra" ] || [ "$2" = "xorg" ] || [ "$2" = "cli" ]; then
+    if [ "$2" = "xephyr" ] || [ "$2" = "xpra" ] || [ "$2" = "xspice" ] || [ "$2" = "xorg" ] || [ "$2" = "cli" ]; then
         METHOD="$2"
     else
         echo "Unknown value '$2' for parameter $key"
