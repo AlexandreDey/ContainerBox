@@ -13,11 +13,12 @@ CUT=/usr/bin/cut
 GREP=/bin/grep
 
 function usage {
-    echo "ContainerBox start --name(-n) NAME_OF_BOX --fullscreen(-f) yes|no --method(-m) xephyr|xpra|cli"
+    echo "ContainerBox start --name(-n) NAME_OF_BOX --fullscreen(-f) yes|no --method(-m) xephyr|xpra|cli --clipboard(-c) no|DISPLAY"
     echo ""
     echo "--name [-n]: Name of the box to launch"
     echo "--fullscreen [-f]: Launch fullscreen display"
     echo "--method [-m]: Share a xephyr display, forward display via xpra, or open a new terminal window"
+    echo "--clipboard [-c]: Synchronize guest clipboard and host clipboard specified by DISPLAY"
     echo "--help [-h]: show this help"
 }
 
@@ -42,7 +43,7 @@ function sync_clipboard {
         sleep 0.2
         KEEP_RUNNING=$($LXC exec $GUEST_NAME -- systemctl status lightdm | grep "active (running)")
     done
-    echo "Starting Clipboard Syncing"
+    echo "Starting Clipboard Sync"
     while [ ! -z "$KEEP_RUNNING" ]; do
         HOST_CLIP=$(DISPLAY=:$XHOST $READ_CLIP)
         

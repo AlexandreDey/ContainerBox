@@ -5,6 +5,8 @@ LXC=/snap/bin/lxc
 LS=/bin/ls  
 GREP=/bin/grep
 CUT=/usr/bin/cut
+RM=/bin/rm
+TOUCH=/bin/touch
 CBOX=/etc/ContainerBox
 XWAYLAND=/usr/bin/Xwayland
 XHOST=/usr/bin/xhost
@@ -18,7 +20,7 @@ function get_last_display {
 }
 
 function get_last_user_display {
-    str1=$(ls -ln /tmp/.X11-unix/ | grep "$UID $UID" | tail -n1 | cut -d' ' -f10)
+    str1=$(ls -ln /tmp/.X11-unix/ | grep "$UID $UID" | tail -n1 | $CUT -d' ' -f10)
     str2=""
 
     echo "${str1/X/$str2}"
@@ -40,6 +42,37 @@ function check_display() {
     echo "True"
 }
 
+function sync_clipboard {
+    XHOST=$1
+    XGUEST=$2
+    GUEST_NAME=$3
+    APP=$4
+    WRITE_CLIP="/usr/bin/xclip -selection clipboard -in"
+    READ_CLIP="/usr/bin/xclip -selection clipboard -out"
+
+    COMMON_CLIP=' '
+    CLIP_SYNC_PID=$PID
+    echo "Starting Clipboard Sync"
+    while [ -f ~/.clip_sync ]; do
+        HOST_CLIP=$(DISPLAY=:$XHOST $READ_CLIP)
+        
+        # Clipboard has been updated by host
+        if [ ! -z "$HOST_CLIP" ] && [ "$HOST_CLIP" != "$COMMON_CLIP" ]; then
+            COMMON_CLIP="$HOST_CLIP"
+            # Update guest clipboard
+            printf "$HOST_CLIP" | DISPLAY=:$XGUEST $WRITE_CLIP
+        fi
+        GUEST_CLIP=$(DISPLAY=:$XGUEST $READ_CLIP)
+        # Clipboard has been updated by guest
+        if [ ! -z "$GUEST_CLIP" ] && [ "$GUEST_CLIP" != "$COMMON_CLIP" ]; then
+            COMMON_CLIP=$GUEST_CLIP
+            # Update host clipboard
+            printf "$GUEST_CLIP" | DISPLAY=:$XHOST $WRITE_CLIP
+        fi
+        sleep 0.4
+    done
+    echo "Ending Clipboard Sync"
+} 
 
 function launch_app() {
     EXPORT="export XDG_RUNTIME_DIR=/run/user/$UID/"
@@ -84,8 +117,7 @@ function launch_insecure() {
         lastX=$(get_main_display)
         $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
 
-        launch_app $1 "$2" "XWL"
-
+        launch_app $1 "$2" "XWL" 
         # Cleanup
         $LXC config device remove $1 Xwl
         $LXC config device remove $1 wl0 
@@ -128,8 +160,8 @@ function launch_nested() {
     HEIGHT=600
     # Specified width height
     if [ ! -z "$3" ];then 
-        WIDTH=$(echo $3 | cut -d'x' -f1)
-        HEIGHT=$(echo $3 | cut -d'x' -f2)
+        WIDTH=$(echo $3 | $CUT -d'x' -f1)
+        HEIGHT=$(echo $3 | $CUT -d'x' -f2)
     fi
     if [ "$(check_display $1)" != "True" ]; then
         $KWIN -s wayland-$1 --width $WIDTH --height $HEIGHT &
@@ -137,8 +169,8 @@ function launch_nested() {
     fi
     # has the device been created
     if [ "$(check_display $1)" != "True" ]; then
-        >&2 echo "[ERROR]: Cannot create nested Wayland display"
-        return
+        >&2 echo "[ERROR]: Cannot create nested Wayland display wayland-$1"
+        exit
     fi
 
     # Allow access to Xwayland
@@ -148,12 +180,23 @@ function launch_nested() {
     $LXC exec $1 -- mkdir -p /run/user/$UID
     $LXC exec $1 -- chown -R $UID:$UID /run/user/$UID
 
+    # Cleanup
+    $LXC config device remove $1 Xwl
+    $LXC config device remove $1 wl0
+
     # Passthrough wayland Display
     $LXC config device add $1 wl0 proxy connect="unix:/run/user/$UID/wayland-$1" listen="unix:/run/user/$UID/wayland-0" uid=$UID gid=$UID  bind=container
     # Passthrough Xwayland
     $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
 
+    # Start clipboard sharing
+    $TOUCH ~/.clip_sync
+    sync_clipboard $(get_main_display) $lastX $1 &
+
     launch_app $1 "$2" "XWL"
+
+    # Stop Clipboard sharing
+    $RM ~/.clip_sync
 
     # Cleanup
     $LXC config device remove $1 Xwl

@@ -24,10 +24,11 @@ Usage
 + ContainerBox create -n NAME_OF_CONTAINER(required) -t DISTRO_TO_USE (ubuntu debian fedora -- default: fedora) -d DESKTOP_ENVIRONMENT(KDE GNOME XFCE MATE -- default: XFCE) --x yes|no (experimental xpra support -- default:no)
   
 -  **Start a container**
-+ ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!!security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?)
++ ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!!security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?) --c no|DISPLAY_NUMBER (share clipboard)
 
 -  **GPU accelerated app in container**
-+ ContainerBox runapp NAME "command arg1 arg2 ... argN" (NOTE: requires to either be running inside a wayland environment, or having kwin_wayland and XWayland installed)
++ ContainerBox runapp NAME "command arg1 arg2 ... argN" secure(default)|nested|insecure [WIDTHxHEIGHT]
++ NOTE: 'secure' requires to be running inside a wayland environment and 'nested' having kwin_wayland and XWayland installed
 
 -  **Configure a container**
 + ContainerBox config network|system|shared_folder|sound NAME_OF_CONTAINER(required) [ OPTIONS ]
@@ -37,6 +38,12 @@ Usage
 
 -  **Show Usage**
 + ContainerBox create|config|runapp|snapshot help
+
+SCREENSHOTS
+-----------
+
+![LightDM ContainerBox](ContainerBox.png?raw=true "ContainerBox LightDM login screen")
+![XFCE Debian ContainerBox](ContainerBox_logged.png?raw=true "ContainerBox XFCE session debian")
  
 TODO List (in order of priority)
 --------------------------------
