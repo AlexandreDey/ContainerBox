@@ -31,7 +31,7 @@ function finish_setup {
     $LXC exec $1 -- groupadd sudo
     $LXC exec $1 -- groupadd wheel
     $LXC exec $1 -- useradd -m $2 -G sudo
-    $LXC exec $1 -- useradd -a -G wheel $2
+    $LXC exec $1 -- usermod -a -G wheel $2
 
     # Change password
     $LXC exec $1 -- bash -c "echo -e \"$3\n$3\n\" | passwd $2"

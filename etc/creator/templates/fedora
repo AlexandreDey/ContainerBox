@@ -4,7 +4,7 @@ LXC=/snap/bin/lxc
 CONF="$CB_CONF/creator/resources/10_container_box.conf"
 
 function create_container {
-    $LXC launch images:fedora/27 $1
+    $LXC launch images:fedora/29 $1
     echo "Waiting for end of init"
     sleep 5
 }

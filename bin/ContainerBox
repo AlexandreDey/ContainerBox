@@ -42,7 +42,7 @@ elif [ "$1" = "start" ]; then
 elif [ "$1" = "config" ]; then
     $BASH $CONFIG/host/config $B
 elif [ "$1" = "runapp" ]; then
-    $BASH $CONFIG/host/runapp $2 "$3"
+    $BASH $CONFIG/host/runapp $2 "$3" $4 $5
 elif [ "$1" = "snapshot" ]; then
     $BASH $CONFIG/host/snapshot $B
 elif [ "$1" = "help" ]; then

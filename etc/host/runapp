@@ -6,7 +6,8 @@ LS=/bin/ls
 GREP=/bin/grep
 CUT=/usr/bin/cut
 CBOX=/etc/ContainerBox
-SUDO=/usr/bin/sudo
+XWAYLAND=/usr/bin/Xwayland
+XHOST=/usr/bin/xhost
 LXC_USER=$($GREP "lxd" /etc/subuid | $CUT -d':' -f2)
 
 function get_last_display {
@@ -15,6 +16,20 @@ function get_last_display {
 
     echo "${str1/X/$str2}"
 }
+
+function get_last_user_display {
+    str1=$(ls -ln /tmp/.X11-unix/ | grep "$UID $UID" | tail -n1 | cut -d' ' -f10)
+    str2=""
+
+    echo "${str1/X/$str2}"
+}
+function get_main_display {
+    str1=$DISPLAY
+    str2=""
+
+    echo "${str1/:/$str2}"
+}
+
 
 function check_display() {
     test=$($LS /run/user/$UID/wayland-$1)
@@ -25,31 +40,17 @@ function check_display() {
     echo "True"
 }
 
-SETFACL=/usr/bin/setfacl
-function add_display() {
-    if [ "$(check_display $1)" != "True" ]; then
-        $KWIN -s wayland-$1 &
-        sleep 2
-    fi
-    # has the device been created
-    if [ "$(check_display $1)" != "True" ]; then
-        echo "False"
-        return
-    fi
-
-    lastX=$(get_last_display)
-
-    $SETFACL -m u:$(($LXC_USER + $UID)):rwx,g:$(($LXC_USER + $UID)):rwx $PULSE_PATH
-    $LXC config device add $1 wl0 proxy connect="unix:@/run/user/$UID/wayland-$1" listen="unix:@/run/user/$UID/wayland-0" bind=container
-    # Xwayland screen
-    DISPLAY=:$lastX xhost +local:
-    $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
-
-    echo "True"
-
-}
 
 function launch_app() {
+    EXPORT="export XDG_RUNTIME_DIR=/run/user/$UID/"
+    # if Wayland is passed through
+    if [[ "$3" == *"WL"* ]]; then
+        EXPORT="$EXPORT && export XDG_SESSION_TYPE=wayland && export WAYLAND_DISPLAY=wayland-0"
+    fi
+    # if X is passed through
+    if [[ "$3" == *"X"* ]]; then
+        EXPORT="$EXPORT && export DISPLAY=:0"
+    fi
 
     # check if uid exists in container
     test=$($LXC exec $1 -- getent passwd $UID)
@@ -58,40 +59,162 @@ function launch_app() {
         $LXC exec $UID -- useradd ephemeral$UID --uid $UID --create-home --groups video
     fi
 
-    $LXC exec $1 -- su --login "$(echo $test | $CUT -d':' -f1)" -c "export DISPLAY=:0 && $2"
+    # Execute command
+    $LXC exec $1 -- su --login "$(echo $test | $CUT -d':' -f1)" -c "$EXPORT && $2"
 
-    $LXC config device remove $1 wl0
+
+    if [ -z "$test" ]; then
+        # Delete ephemeral user
+        $LXC exec $UID -- userdel ephemeral$UID
+    fi
+
+}
+
+function launch_insecure() {
+    # if there is a host wayland, passthrough this one instead
+    # This one is more secure, but Xwayland still is a X server, and thus any client can see whatever happens on the server
+    if [ "$XDG_SESSION_TYPE" = "wayland" ] && [ ! -z $WAYLAND_DISPLAY ] ; then
+        # Ensure XDG_RUNTIME_DIR is created and that user has access to it
+        $LXC exec $1 -- mkdir -p /run/user/$UID/
+        $LXC exec $1 -- chown -R $UID:$UID /run/user/$UID/
+
+        # Passthrough host wayland
+        $LXC config device add $1 wl0 proxy connect="unix:/run/user/$UID/$WAYLAND_DISPLAY" listen="unix:/run/user/$UID/wayland-0" uid=$UID gid=$UID bind=container
+        # Passthrough host Xwayland screen
+        lastX=$(get_main_display)
+        $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
+
+        launch_app $1 "$2" "XWL"
+
+        # Cleanup
+        $LXC config device remove $1 Xwl
+        $LXC config device remove $1 wl0 
+        
+    # No wayland session, passthrough X only. Vastly insecure, Xorg is not safe
+    else
+        # Passthrough host Xorg screen
+        lastX=$(get_main_display)
+        $LXC config device add $1 X$lastX proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
+
+        launch_app $1 "$2" "X"
+
+        # Cleanup
+        $LXC config device remove $1 X$lastX
+    fi    
+}
+
+function launch_secure() {
+    # Passthrough host wayland display. Wayland is reasonably safe, but not every program is compatible with it
+    if [ "$XDG_SESSION_TYPE" = "wayland" ] && [ ! -z $WAYLAND_DISPLAY ] ; then
+        # Ensure XDG_RUNTIME_DIR is created and that user has access to it
+        $LXC exec $1 -- mkdir -p /run/user/$UID/
+        $LXC exec $1 -- chown -R $UID:$UID /run/user/$UID/
+
+        # Passthrough host wayland
+        $LXC config device add $1 wl0 proxy connect="unix:/run/user/$UID/$WAYLAND_DISPLAY" listen="unix:/run/user/$UID/wayland-0" uid=$UID gid=$UID bind=container
+        
+        launch_app $1 "$2" "WL"
+
+        # Cleanup
+        $LXC config device remove $1 wl0 
+    
+    else
+        >&2 echo "[ERROR]: 'secure' mode requires to be running on a Wayland session. You can still run in 'nested' mode for maximal security"
+    fi
+}
+
+function launch_nested() {
+    WIDTH=1200
+    HEIGHT=600
+    # Specified width height
+    if [ ! -z "$3" ];then 
+        WIDTH=$(echo $3 | cut -d'x' -f1)
+        HEIGHT=$(echo $3 | cut -d'x' -f2)
+    fi
+    if [ "$(check_display $1)" != "True" ]; then
+        $KWIN -s wayland-$1 --width $WIDTH --height $HEIGHT &
+        sleep 2
+    fi
+    # has the device been created
+    if [ "$(check_display $1)" != "True" ]; then
+        >&2 echo "[ERROR]: Cannot create nested Wayland display"
+        return
+    fi
+
+    # Allow access to Xwayland
+    lastX=$(get_last_user_display)
+    DISPLAY=:$lastX $XHOST +local:lxd
+    # Ensure XDG_RUNTIME_DIR is created and that user has access to it 
+    $LXC exec $1 -- mkdir -p /run/user/$UID
+    $LXC exec $1 -- chown -R $UID:$UID /run/user/$UID
+
+    # Passthrough wayland Display
+    $LXC config device add $1 wl0 proxy connect="unix:/run/user/$UID/wayland-$1" listen="unix:/run/user/$UID/wayland-0" uid=$UID gid=$UID  bind=container
+    # Passthrough Xwayland
+    $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
+
+    launch_app $1 "$2" "XWL"
+
+    # Cleanup
     $LXC config device remove $1 Xwl
-
+    $LXC config device remove $1 wl0
+    KWIN_PID=$(pidof kwin_wayland)
+    if [ ! -z $KWIN_PID ];then
+        kill -9 $KWIN_PID
+    fi 
 }
 
 function launch() {
-
-    # if there is a host wayland, passthrough this one instead
-    if [ "$XDG_SESSION_TYPE" = "wayland" ] && [ ! -z $WAYLAND_DISPLAY ] ; then
-        $SUDO $CBOX/helpers/passthrough $UID $1 /run/user/$UID/$WAYLAND_DISPLAY /run/user/$UID/wayland-0
-        # Xwayland screen
-        lastX=$(get_last_display)
-        $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
-    else 
-        add_display $1
+    if [ "$3" == "nested" ];then
+        launch_nested $1 "$2" $4
+    elif [ "$3" == "insecure" ];then
+        launch_insecure $1 "$2"
+    # default to secure
+    else
+        launch_secure $1 "$2"
     fi
-    launch_app $1 "$2"
 }
 
 function usage() {
-    echo "ContainerBox runapp NAME_OF_BOX \"command arg1 arg2 ... argN\""
+    echo "ContainerBox runapp NAME_OF_BOX \"command arg1 arg2 ... argN\" secure(default)|nested|insecure [WIDTHxHEIGHT]"
+    echo "secure = Passthrough only host Wayland. Requires running a wayland session"
+    echo "nested = Passthrough a nested kwin_wayland and XWayland. Requires kwin_wayland"
+    echo "insecure = Passthrough host Wayland (if available) and host Xorg server. Xorg is not secure, an attacker can spy on every input send to the xserver"
     echo "--help [-h]: show this help"
 }
 
 NAME=$1
 COM=$2
+MODE=$3
+SIZE=$4
 
 if [ -z $NAME ]; then
     echo "Provide at least the name of the box and the command to execute"
     usage $0
     exit 
 fi
+
+if [ -z "$COM" ]; then
+    echo "Provide the command to execute"
+    exit 
+fi
+
+if [ -z $MODE ]; then
+    MODE="secure"
+fi
+if [ $MODE != "secure" ] && [ $MODE != "insecure" ] && [ $MODE != "nested" ]; then
+    echo "Mode can only be 'secure', 'nested' or 'insecure', not '$MODE'. Defaulting to 'secure'"
+    MODE="secure" 
+fi
+
+if [ -z $SIZE ]; then
+    SIZE="1200x600"
+fi
+if [[ "$SIZE" != *"x"* ]];then
+    echo "Wrong format for size '$SIZE'. Should be WIDTHxHEIGHT. Defaulting to 1200x600"
+    SIZE="1200x600"
+fi
+
 if [ "$NAME" = "--help" ] || [ "$NAME" = "-h" ] || [ "$NAME" = "help" ];then
     usage $0
     exit 
@@ -115,9 +238,5 @@ if [ -z "$testing_life" ]; then
     exit
 fi
 
-if [ -z "$COM" ]; then
-    echo "Provide the command to execute"
-    exit 
-fi
-
-launch $NAME "$COM"
+echo "launch $NAME \"$COM\" $MODE $SIZE"
+launch $NAME "$COM" $MODE $SIZE

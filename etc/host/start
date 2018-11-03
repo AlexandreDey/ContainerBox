@@ -17,7 +17,7 @@ function usage {
     echo ""
     echo "--name [-n]: Name of the box to launch"
     echo "--fullscreen [-f]: Launch fullscreen display"
-    echo "--method [-m]: Share a xephyr display forward display via xpra or open a new terminal window"
+    echo "--method [-m]: Share a xephyr display, forward display via xpra, or open a new terminal window"
     echo "--help [-h]: show this help"
 }
 
@@ -27,6 +27,44 @@ function get_last_display {
 
     echo "${str1/X/$str2}"
 }
+
+function sync_clipboard {
+    XHOST=$1
+    XGUEST=$2
+    GUEST_NAME=$3
+    WRITE_CLIP="/usr/bin/xclip -selection clipboard -in"
+    READ_CLIP="/usr/bin/xclip -selection clipboard -out"
+
+    COMMON_CLIP=' '
+    KEEP_RUNNING=$($LXC exec $GUEST_NAME -- systemctl status lightdm | grep "active (running)")
+    while [ -z "$KEEP_RUNNING" ]; do
+        # Wait for lightdm to be started
+        sleep 0.2
+        KEEP_RUNNING=$($LXC exec $GUEST_NAME -- systemctl status lightdm | grep "active (running)")
+    done
+    echo "Starting Clipboard Syncing"
+    while [ ! -z "$KEEP_RUNNING" ]; do
+        HOST_CLIP=$(DISPLAY=:$XHOST $READ_CLIP)
+        
+        # Clipboard has been updated by host
+        if [ ! -z "$HOST_CLIP" ] && [ "$HOST_CLIP" != "$COMMON_CLIP" ]; then
+            COMMON_CLIP="$HOST_CLIP"
+            # Update guest clipboard
+            printf "$HOST_CLIP" | DISPLAY=:$XGUEST $WRITE_CLIP
+        fi
+        GUEST_CLIP=$(DISPLAY=:$XGUEST $READ_CLIP)
+        # Clipboard has been updated by guest
+        if [ ! -z "$GUEST_CLIP" ] && [ "$GUEST_CLIP" != "$COMMON_CLIP" ]; then
+            COMMON_CLIP=$GUEST_CLIP
+            # Update host clipboard
+            printf "$GUEST_CLIP" | DISPLAY=:$XHOST $WRITE_CLIP
+        fi
+        sleep 0.4
+        KEEP_RUNNING=$($LXC exec $GUEST_NAME -- systemctl status lightdm | grep "active (running)")
+    done
+    echo "Ending Clipboard Sync"
+} 
+
 
 function create_xorg {
     echo $2
@@ -47,11 +85,16 @@ function launch_xorg {
 	$LXC config device remove $1 "X$display"
 	$LXC config device add $1 "X$display" proxy listen="unix:@/tmp/.X11-unix/X0" connect="unix:@/tmp/.X11-unix/X$display" bind=container
 
+    # Start shared clipboard
+    if [ "$2" != "no" ]; then
+        sync_clipboard $2 $display $1 &
+    fi
+
 	echo "Display :$display socket passed to $1"
 }
 
 function create_xephyr {
-    $CHROOT $XEPHYR ":$2" $3 -glamor -title "ContainerBox -- $1" -resizeable -br -terminate -noreset +extension GLX +extension RANDR +extension RENDER
+    $CHROOT $XEPHYR ":$2" $3 -glamor -title "ContainerBox -- $1" -screen 1200x800 -br -terminate -noreset +extension GLX +extension RANDR +extension RENDER
 	wait 
 	# Remove the device once host is disconnected
 	$LXC config device remove $1 "X$2"
@@ -68,6 +111,11 @@ function launch_xephyr {
 	$LXC config device remove $1 "X$display"
 	$LXC config device add $1 "X$display" proxy listen="unix:@/tmp/.X11-unix/X0" connect="unix:@/tmp/.X11-unix/X$display" bind=container
 
+    # Start shared clipboard
+    if [ "$2" != "no" ]; then
+        sync_clipboard $2 $display $1 &
+    fi
+
 	echo "Display :$display socket passed to $1"
 }
 
@@ -82,6 +130,11 @@ function launch_xephyr_fullscreen {
 	$LXC config device remove $1 "X$display"
 	$LXC config device add $1 "X$display" proxy listen="unix:@/tmp/.X11-unix/X0" connect="unix:@/tmp/.X11-unix/X$display" bind=container
 
+    # Start shared clipboard
+    if [ "$2" != "no" ]; then
+        sync_clipboard $2 $display $1 &
+    fi
+
 	echo "Display :$display socket passed to $1"
 }
 
@@ -90,33 +143,34 @@ function create_xpra {
     $LXC exec $1 -- xpra start-desktop --xvfb="Xorg -noreset +extension GLX +extension RANDR +extension RENDER -logfile ./0.log -config /etc/xpra/xorg.conf :0" --bind-tcp=0.0.0.0:10000
     
     echo "Waiting for server creation"
+    $LXC config device remove $1 xpra
+	$LXC config device add $1 xpra proxy listen="tcp:localhost:10000" connect="tcp:localhost:10000" bind=host
     lxdip=$($LXC list | $GREP "| $1 " | $CUT -d'|' -f4 | $CUT -d' ' -f2)
     while [ -z "$(nmap $lxdip -p 10000 | $GREP open)" ]; do
         echo "still closed"
         sleep 1
     done
-
 }
 
 function launch_xpra {
     create_xpra $1
     lxdip=$($LXC list | $GREP "| $1 " | $CUT -d'|' -f4 | $CUT -d' ' -f2)
-    xpra attach tcp/$lxdip:10000 --encoding=rgb --speed=100 &
+    xpra attach tcp/localhost:10000 --encoding=rgb --speed=100 &
 }
 
 function launch_xpra_fullscreen {
     create_xpra $1
     lxdip=$($LXC list | $GREP "| $1 " | $CUT -d'|' -f4 | $CUT -d' ' -f2)
-    xpra attach tcp/$lxdip:10000 --encoding=rgb --speed=100 --desktop-fullscreen=True &
+    xpra attach tcp/localhost:10000 --encoding=rgb --speed=100 --desktop-fullscreen=True &
 }
 
 function start_lightdm {
-    $LXC exec $1 -- lightdm
+    $LXC exec $1 -- systemctl start lightdm
 }
 
 function launch_terminal {
     if [ -f "/usr/bin/gnome-terminal" ]; then
-        /usr/bin/gnome-terminal -- /bin/bash -c "lxc exec $1 -- bash || sh"
+        /usr/bin/gnome-terminal -- /bin/bash -c "lxc exec $1HOST -- bash || sh"
     elif [ -f "/usr/bin/tilix" ]; then
         /usr/bin/tilix -e lxc exec $1 -- bash || sh
     elif [ -f "/usr/bin/konsole" ]; then
@@ -131,25 +185,29 @@ function launch_terminal {
 }
 
 function launch {
+    # Ensure Xorg has been stopped
+    if [ "$2" = "xpra" ]; then
+        $LXC exec $1 -- killall Xorg
+    fi
     # fullscreen
     if [ "$3" = "yes" ] && [ "$2" = "xephyr" ]; then
-        launch_xephyr_fullscreen $1
+        launch_xephyr_fullscreen $1 $4
     fi
     if [ "$3" = "yes" ] && [ "$2" = "xpra" ]; then
         launch_xpra_fullscreen $1
     fi
     if [ "$3" = "yes" ] && [ "$2" = "xorg" ]; then
-        launch_xorg $1
+        launch_xorg $1 $4
     fi
     # Resizeable window
     if [ "$3" = "no" ] && [ "$2" = "xephyr" ]; then
-        launch_xephyr $1
+        launch_xephyr $1 $4
     fi
     if [ "$3" = "no" ] && [ "$2" = "xpra" ]; then
         launch_xpra $1
     fi
     if [ "$3" = "no" ] && [ "$2" = "xorg" ]; then
-        launch_xorg $1
+        launch_xorg $1 $4
     fi
 
     if [ "$2" = "cli" ]; then
@@ -158,15 +216,14 @@ function launch {
         # launch lightdm
         start_lightdm $1
     fi
-    if [ "$2" = "xpra" ]; then
-        $LXC exec $1 -- killall Xorg
-    fi
+    
     
 
 }
 
 METHOD="xephyr"
 FULLSCREEN="no"
+SHARE_CLIP="no"
 
 CMD=$0
 
@@ -198,6 +255,11 @@ case $key in
         echo "Unknown value '$2' for parameter $key"
         exit
     fi    
+    shift # past argument
+    shift # past value
+    ;;
+    -c|--clipboard)
+    SHARE_CLIP="$2"
     shift # past argument
     shift # past value
     ;;
@@ -242,4 +304,4 @@ if [ -z "$testing_life" ]; then
     exit
 fi
 
-launch $NAME $METHOD $FULLSCREEN
+launch $NAME $METHOD $FULLSCREEN $SHARE_CLIP
