@@ -24,7 +24,7 @@ Usage
 + ContainerBox create -n NAME_OF_CONTAINER(required) -t DISTRO_TO_USE (ubuntu debian fedora -- default: fedora) -d DESKTOP_ENVIRONMENT(KDE GNOME XFCE MATE -- default: XFCE) --x yes|no (experimental xpra support -- default:no)
   
 -  **Start a container**
-+ ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[!!!security concern !!!] -- default: xephyr) -f yes|no (fullscreen ?) --c no|DISPLAY_NUMBER (share clipboard)
++ ContainerBox start -n NAME -m DISPLAY_METHOD (xephyr xpra xorg[rootless Xorg] -- default: xephyr) -f yes|no (fullscreen ?) --c no|DISPLAY_NUMBER (share clipboard)
 
 -  **GPU accelerated app in container**
 + ContainerBox runapp NAME "command arg1 arg2 ... argN" secure(default)|nested|insecure [WIDTHxHEIGHT]
@@ -38,6 +38,13 @@ Usage
 
 -  **Show Usage**
 + ContainerBox create|config|runapp|snapshot help
+
+NOTES
+-----
+
++ GNOME Can only work if the display has OpenGL. Possible options are: xorg, xspice, xpra
+
++ For security reasons, Xorg backend starts a Xorg server as the currently logged user (be sure to add this user to video and input groups). It also opens the first available tty, which requires root privileges, and thus the user must also be a sudoer. 
 
 SCREENSHOTS
 -----------
@@ -61,5 +68,3 @@ DISCLAIMER
 ----------
 
 This is still experimental use at your own risk (no real reason for it to break anything, but still)
-GNOME is not working unless you login as root (still figuring it out)
- 
