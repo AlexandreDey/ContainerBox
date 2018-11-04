@@ -43,7 +43,7 @@ function check_display() {
 }
 
 function sync_clipboard {
-    XHOST=$1
+    X_HOST=$1
     XGUEST=$2
     GUEST_NAME=$3
     APP=$4
@@ -54,7 +54,7 @@ function sync_clipboard {
     CLIP_SYNC_PID=$PID
     echo "Starting Clipboard Sync"
     while [ -f ~/.clip_sync ]; do
-        HOST_CLIP=$(DISPLAY=:$XHOST $READ_CLIP)
+        HOST_CLIP=$(DISPLAY=:$X_HOST $READ_CLIP)
         
         # Clipboard has been updated by host
         if [ ! -z "$HOST_CLIP" ] && [ "$HOST_CLIP" != "$COMMON_CLIP" ]; then
@@ -67,7 +67,7 @@ function sync_clipboard {
         if [ ! -z "$GUEST_CLIP" ] && [ "$GUEST_CLIP" != "$COMMON_CLIP" ]; then
             COMMON_CLIP=$GUEST_CLIP
             # Update host clipboard
-            printf "$GUEST_CLIP" | DISPLAY=:$XHOST $WRITE_CLIP
+            printf "$GUEST_CLIP" | DISPLAY=:$X_HOST $WRITE_CLIP
         fi
         sleep 0.4
     done
@@ -175,7 +175,7 @@ function launch_nested() {
 
     # Allow access to Xwayland
     lastX=$(get_last_user_display)
-    DISPLAY=:$lastX $XHOST +local:lxd
+    DISPLAY=:$lastX $XHOST +SI:localuser:lxd
     # Ensure XDG_RUNTIME_DIR is created and that user has access to it 
     $LXC exec $1 -- mkdir -p /run/user/$UID
     $LXC exec $1 -- chown -R $UID:$UID /run/user/$UID
@@ -185,7 +185,7 @@ function launch_nested() {
     $LXC config device remove $1 wl0
 
     # Passthrough wayland Display
-    $LXC config device add $1 wl0 proxy connect="unix:/run/user/$UID/wayland-$1" listen="unix:/run/user/$UID/wayland-0" uid=$UID gid=$UID  bind=container
+    $LXC config device add $1 wl0 proxy connect="unix:/run/user/$UID/wayland-$1" listen="unix:/run/user/$UID/wayland-0" uid=$UID gid=$UID mode=775 bind=container
     # Passthrough Xwayland
     $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
 

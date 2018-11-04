@@ -1,6 +1,5 @@
 #!/bin/bash
-
-CHROOT=""
+OPENVT=/bin/openvt
 XEPHYR=/usr/bin/Xephyr
 XPRA=/usr/bin/xpra
 LXC=/snap/bin/lxc
@@ -11,6 +10,9 @@ XORG=/usr/bin/Xorg
 SUDO=/usr/bin/sudo
 CUT=/usr/bin/cut
 GREP=/bin/grep
+LS=/bin/ls
+TTY=/bin/tty
+WHOAMI=/bin/whoami
 REMOTE_VIEWER=/usr/bin/remote-viewer
 
 function usage {
@@ -45,6 +47,7 @@ function create_xspice {
     echo "Waiting for server creation"
     $LXC config device remove $1 spice
 	$LXC config device add $1 spice proxy listen="tcp:localhost:$PORT" connect="tcp:localhost:5900" bind=host
+    sleep 2
     while [ -z "$(nmap localhost -p $PORT | $GREP open)" ]; do
         echo "still closed"
         sleep 1
@@ -55,7 +58,7 @@ function launch_xspice {
     PORT=$(get_spice_port)
     create_xspice $1 $PORT
     $REMOTE_VIEWER spice://localhost:$PORT -t "ContainerBox -- $1" &
-}
+}   
 
 function launch_xspice_fullscreen {
     PORT=$(get_spice_port)
@@ -100,21 +103,45 @@ function sync_clipboard {
     echo "Ending Clipboard Sync"
 } 
 
+function check_display() {
+    test=$($LS /run/user/$UID/ContainerBox-$1)
+    if [ -z "$test" ]; then
+        echo "False"
+        return
+    fi
+    echo "True"
+}
+
+function get_first_vt() {
+    VT=7
+    CHECK=$(sudo $OPENVT -c $VT -- clear 2>&1 | grep "in use")
+    while [ ! -z "$CHECK" ];do
+        VT=$(($VT + 1))
+        CHECK=$(sudo $OPENVT -c $VT -- clear 2>&1 | grep "in use")
+    done
+    echo $VT
+}
+
 
 function create_xorg {
-    echo $2
-    $SUDO $XORG ":$2" $3 -noreset -terminate +extension GLX +extension RANDR +extension RENDER
-	wait 
-	# Remove the device once host is disconnected
-	$LXC config device remove $1 "X$2"
+    USER=$($WHOAMI)
+    $SUDO $OPENVT -c $3 -- su --login $USER -c "$XORG :$2 vt$3 -noreset -terminate +extension GLX +extension RANDR +extension RENDER"
+
+    KEEP_RUNNING=$($LXC exec $GUEST_NAME -- systemctl status lightdm | grep "active (running)")
+    while [ ! -z "$KEEP_RUNNING" ]; do
+        # Wait for lightdm to be stopped
+        sleep 0.5
+        KEEP_RUNNING=$($LXC exec $GUEST_NAME -- systemctl status lightdm | grep "active (running)")
+    done
+    $LXC config device remove $1 X$2
 }
 
 function launch_xorg {
     last=$(get_last_display)
     display=$((last +1))
-
-    create_xorg $1 $display &
-    sleep 1
+    VT=$(get_first_vt)
+    create_xorg $1 $display "$VT" &
+    sleep 2
 
     # Ensure it is not already passed through
 	$LXC config device remove $1 "X$display"
@@ -129,7 +156,7 @@ function launch_xorg {
 }
 
 function create_xephyr {
-    $CHROOT $XEPHYR ":$2" $3 -glamor -title "ContainerBox -- $1" -screen 1200x800 -br -terminate -noreset +extension GLX +extension RANDR +extension RENDER
+    $XEPHYR ":$2" $3 -glamor -title "ContainerBox -- $1" -screen 1200x800 -br -terminate -noreset +extension GLX +extension RANDR +extension RENDER
 	wait 
 	# Remove the device once host is disconnected
 	$LXC config device remove $1 "X$2"

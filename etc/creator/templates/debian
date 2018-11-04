@@ -7,6 +7,8 @@ function create_container {
     $LXC launch images:debian/10 $1
     echo "Waiting for end of init"
     sleep 5
+    $LXC exec $1 -- ip link set device eth0 up
+    $LXC exec $1 -- dhclient eth0
 }
 
 function install_de_xfce {

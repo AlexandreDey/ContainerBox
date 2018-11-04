@@ -1,6 +1,0 @@
-Template=vanilla
-DisplayEnvironment=alpine/edge
-EnableXpra=no
-
-NetworkInterface=eth0: type>lxdNAT -- host_interface>lxdbr0 -- network_address>10.238.125.1/24
-NetworkInterface=eth1: type>lxd -- host_interface>internalbr0 -- network_address>10.10.10.1/24
