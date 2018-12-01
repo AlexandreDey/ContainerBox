@@ -199,7 +199,7 @@ function network_get {
     PARENT=$($LXC config show $CONTAINER_NAME --expanded | $GREP "nictype:" -B1 -A2 | $GREP "$DEVICE_CONTAINER_NAME:" -A3 | $GREP "parent:" | $CUT -d':' -f2 | $CUT -d' ' -f2 )
 
     if [ -z "$rawNICTYPE" ]; then
-        "[ERROR] : $DEVICE_CONTAINER_NAME is not attached to $CONTAINER_NAME"
+        echo "[ERROR] : $DEVICE_CONTAINER_NAME is not attached to $CONTAINER_NAME"
         return
     fi
 
@@ -232,7 +232,7 @@ function network_list {
     nb=$($LXC config show $CONTAINER_NAME --expanded | $GREP "nictype:" -B1 | $GREP -v "nictype:" | $WC -l)
     for i in $(seq 1 2 $nb); do
         NAME=$(echo $raw | $CUT -d' ' -f$i | $CUT -d':' -f1)
-        network_get $CONTAINER_NAME $NAME
+        network_get "$CONTAINER_NAME" "$NAME"
     done
 }
 
@@ -257,8 +257,8 @@ function network_usage {
 } 
 
 function network {
-    ACTION=$2
-    NAME=$1
+    ACTION=$1
+    NAME=$2
     if [ -z "$1" ] || [ "none" = "$1" ] ; then
         network_usage
         exit
@@ -266,9 +266,9 @@ function network {
     if [ -z "$2" ] ; then
         echo "[ERROR] : Provide a container name"
         exit
-    fi
+    fi  
     test=$($LXC list | $GREP " $2 ")
-    if [ ! -z "$test" ] ; then
+    if [ -z "$test" ] ; then
         echo "[ERROR] : unknown container $2"
         exit
     fi

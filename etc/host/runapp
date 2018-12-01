@@ -11,6 +11,8 @@ CBOX=/etc/ContainerBox
 XWAYLAND=/usr/bin/Xwayland
 XHOST=/usr/bin/xhost
 LXC_USER=$($GREP "lxd" /etc/subuid | $CUT -d':' -f2)
+TAIL=/usr/bin/tail
+REV=/usr/bin/rev
 
 function get_last_display {
     str1=$(ls /tmp/.X11-unix/ | tail -n1)
@@ -20,7 +22,7 @@ function get_last_display {
 }
 
 function get_last_user_display {
-    str1=$(ls -ln /tmp/.X11-unix/ | grep "$UID $UID" | tail -n1 | $CUT -d' ' -f10)
+    str1=$(ls -ln /tmp/.X11-unix/ | grep "$UID $UID" | $TAIL -n1 | $REV | $CUT -d' ' -f1 | $REV)
     str2=""
 
     echo "${str1/X/$str2}"
@@ -84,7 +86,6 @@ function launch_app() {
     if [[ "$3" == *"X"* ]]; then
         EXPORT="$EXPORT && export DISPLAY=:0"
     fi
-
     # check if uid exists in container
     test=$($LXC exec $1 -- getent passwd $UID)
     if [ -z "$test" ]; then
@@ -187,7 +188,7 @@ function launch_nested() {
     # Passthrough wayland Display
     $LXC config device add $1 wl0 proxy connect="unix:/run/user/$UID/wayland-$1" listen="unix:/run/user/$UID/wayland-0" uid=$UID gid=$UID mode=775 bind=container
     # Passthrough Xwayland
-    $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0" bind=container
+    $LXC config device add $1 Xwl proxy connect="unix:@/tmp/.X11-unix/X$lastX" listen="unix:@/tmp/.X11-unix/X0"bind=container
 
     # Start clipboard sharing
     $TOUCH ~/.clip_sync
